@@ -1,0 +1,12 @@
+pub mod authentication;
+pub mod calendar;
+pub mod common;
+pub mod edit_series;
+pub mod management;
+pub mod plugins;
+pub mod profiles;
+pub mod search;
+pub mod series_library;
+pub mod settings;
+pub mod system;
+pub mod wanted;

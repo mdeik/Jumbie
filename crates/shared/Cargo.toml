@@ -1,0 +1,27 @@
+[package]
+name = "jumbie_shared"
+version = "0.1.0"
+edition = "2024"
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("docker-defaults"))'] }
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.12"
+
+sqlx = { version = "0.8", features = ["sqlite", "chrono"], optional = true }
+config = "0.15"
+toml = "1.1"
+uuid = { version = "1.23", features = ["v4"] }
+
+plugin-sdk = { path = "../plugin-sdk" }
+
+[dev-dependencies]
+tempfile = "3.27"
+
+[features]
+docker-defaults = []
+backend = ["sqlx"]

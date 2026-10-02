@@ -1,0 +1,10 @@
+name: Generate installer assets
+description: Generates jumbie.ico (from frontend/icons/icon-512.png) and LICENSE.rtf (from LICENSE) into backend/windows/ for MSI packaging and exe icon embedding. Windows-only.
+runs:
+  using: composite
+  steps:
+    # Windows PowerShell 5.1 (powershell.exe) is used here because
+    # System.Drawing is only available on .NET Framework, which pwsh 7
+    # does not ship with.
+    - shell: pwsh
+      run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${{ github.action_path }}/generate-installer-assets.ps1"

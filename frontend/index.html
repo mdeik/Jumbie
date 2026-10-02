@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Jumbie</title>
+        <link data-trunk rel="css" href="style.css" />
+        <link data-trunk rel="copy-file" href="manifest.json" />
+        <link data-trunk rel="copy-dir" href="icons" />
+        <link rel="manifest" href="/manifest.json" />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="16x16"
+            href="/icons/icon-16.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="32x32"
+            href="/icons/icon-32.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="192x192"
+            href="/icons/icon-192.png"
+        />
+        <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+    </head>
+
+    <body>
+        <script>
+            // Show/position the tooltip for a host. Idempotent — safe to call again
+            // (e.g. on scroll) to keep a visible tooltip pinned to its host.
+            //
+            // `.tooltip-content` is `position: fixed`, so it escapes every
+            // intermediate clipping ancestor (cards, table scroll wrappers,
+            // `overflow: clip` badges, …). It is bounded to the enclosing modal, if
+            // any, otherwise the window — and clamped to the window either way.
+            function positionTooltip(icon, remeasure) {
+                const tooltip = icon.querySelector(".tooltip-content");
+                if (!tooltip) return;
+
+                const padding = 16;
+
+                // Natural size. Measure it on show — `max-height: none` drops the
+                // previous cap and the base `70vh` clamp, and `border-box` sizing
+                // means using `scrollHeight` would exclude the border (~2px short,
+                // forcing a needless scrollbar). On scroll we reuse the cached size
+                // so re-placing doesn't reset the tooltip's own scroll position.
+                let tooltipWidth = icon._tipWidth;
+                let contentHeight = icon._tipHeight;
+                if (remeasure || tooltipWidth === undefined) {
+                    tooltip.style.maxHeight = "none";
+                    const rect = tooltip.getBoundingClientRect();
+                    tooltipWidth = rect.width;
+                    contentHeight = rect.height;
+                    icon._tipWidth = tooltipWidth;
+                    icon._tipHeight = contentHeight;
+                }
+
+                const iconRect = icon.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+
+                const modal = icon.closest(".modal-container");
+                const modalRect = modal ? modal.getBoundingClientRect() : null;
+
+                const boundLeft = Math.max(
+                    padding,
+                    modalRect ? modalRect.left + padding : padding,
+                );
+                const boundRight = Math.min(
+                    viewportWidth - padding,
+                    modalRect
+                        ? modalRect.right - padding
+                        : viewportWidth - padding,
+                );
+                const boundTop = Math.max(
+                    padding,
+                    modalRect ? modalRect.top + padding : padding,
+                );
+                const boundBottom = Math.min(
+                    viewportHeight - padding,
+                    modalRect
+                        ? modalRect.bottom - padding
+                        : viewportHeight - padding,
+                );
+
+                // Usable room on each side of the host inside the bound (gap mirrors
+                // the offset applied below).
+                const gap = 8;
+                const spaceAbove = Math.max(0, iconRect.top - boundTop - gap);
+                const spaceBelow = Math.max(
+                    0,
+                    boundBottom - iconRect.bottom - gap,
+                );
+                const fitsAbove = contentHeight <= spaceAbove;
+                const fitsBelow = contentHeight <= spaceBelow;
+
+                // Pick the side that can show the most content. Hosts built with
+                // `with_auto_down` (`.tooltip-auto-down`) prefer opening downward,
+                // only flipping up when the bottom truly cannot fit it and there is
+                // more room above.
+                const isExplicitDown =
+                    icon.classList.contains("tooltip-auto-down");
+                let placeBelow = isExplicitDown;
+                if (isExplicitDown) {
+                    if (!fitsBelow && spaceAbove > spaceBelow) placeBelow = false;
+                } else if (fitsAbove) {
+                    placeBelow = false;
+                } else {
+                    placeBelow = fitsBelow || spaceBelow > spaceAbove;
+                }
+
+                // Cap the height to the chosen side so the tooltip stays inside the
+                // bound; excess content scrolls within the tooltip.
+                const heightCap = placeBelow ? spaceBelow : spaceAbove;
+                const height = Math.max(1, Math.min(contentHeight, heightCap));
+                tooltip.style.maxHeight = `${height}px`;
+
+                // Centre horizontally on the host, clamped to the bound.
+                let left =
+                    iconRect.left + iconRect.width / 2 - tooltipWidth / 2;
+                left = Math.max(
+                    boundLeft,
+                    Math.min(left, boundRight - tooltipWidth),
+                );
+
+                // Sit just above/below the host, clamped to the bound.
+                let top = placeBelow
+                    ? iconRect.bottom + gap
+                    : iconRect.top - gap - height;
+                top = Math.max(boundTop, Math.min(top, boundBottom - height));
+
+                tooltip.style.left = `${left}px`;
+                tooltip.style.top = `${top}px`;
+            }
+
+            document.addEventListener(
+                "mouseover",
+                function (e) {
+                    if (!e.target || !e.target.closest) return;
+                    const icon = e.target.closest(".tooltip-host");
+                    if (!icon) return;
+
+                    // Only run if we're entering from outside the icon
+                    if (e.relatedTarget && icon.contains(e.relatedTarget))
+                        return;
+
+                    // Cancel any pending hide so the tooltip stays visible
+                    if (icon._hideTimeout) {
+                        clearTimeout(icon._hideTimeout);
+                        icon._hideTimeout = null;
+                    }
+
+                    // Don't reposition if already visible — prevents sliding on re-entry
+                    if (icon.classList.contains("tooltip-visible")) return;
+
+                    // Show the tooltip (keeps it visible even when hovering tooltip content)
+                    icon.classList.add("tooltip-visible");
+                    positionTooltip(icon, true);
+                },
+                true,
+            );
+
+            // A `position: fixed` tooltip does not move with its host, so keep the
+            // visible one pinned while the page/modal scrolls. Scrolls *inside* the
+            // tooltip are ignored — re-placing there would fight its own scrolling.
+            document.addEventListener(
+                "scroll",
+                function (e) {
+                    const icon = document.querySelector(
+                        ".tooltip-host.tooltip-visible",
+                    );
+                    if (!icon) return;
+                    const tooltip = icon.querySelector(".tooltip-content");
+                    if (
+                        tooltip &&
+                        (e.target === tooltip || tooltip.contains(e.target))
+                    )
+                        return;
+                    positionTooltip(icon, false);
+                },
+                true,
+            );
+
+            document.addEventListener(
+                "mouseout",
+                function (e) {
+                    if (!e.target || !e.target.closest) return;
+                    const icon = e.target.closest(".tooltip-host");
+                    if (!icon) return;
+
+                    // Keep tooltip visible if moving to tooltip content or another child
+                    if (e.relatedTarget && icon.contains(e.relatedTarget))
+                        return;
+
+                    // Also check: if relatedTarget is the tooltip content itself
+                    // (it's already inside icon, so the check above catches it)
+
+                    // Small delay to let the mouse cross the visual gap
+                    icon._hideTimeout = setTimeout(() => {
+                        icon._hideTimeout = null;
+                        icon.classList.remove("tooltip-visible");
+                        const tooltip = icon.querySelector(".tooltip-content");
+                        if (tooltip) {
+                            tooltip.style.left = "";
+                            tooltip.style.top = "";
+                            tooltip.style.maxHeight = "";
+                        }
+                    }, 100);
+                },
+                true,
+            );
+        </script>
+    </body>
+</html>

@@ -1,0 +1,59 @@
+[package]
+name = "jumbie_frontend"
+version = "0.1.0"
+edition = "2024"
+
+[lints.clippy]
+# These come from the Leptos `view!` macro expansion — auto-fix can't modify generated code.
+unused_unit = { level = "allow" }
+unit_arg = { level = "allow" }
+redundant_closure = { level = "allow" }
+module_inception = "allow"
+needless_borrow = { level = "allow" }
+clone_on_copy = { level = "allow" }
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }
+leptos_router = { version = "0.8" }
+console_error_panic_hook = "0.1"
+jumbie_shared = { path = "../crates/shared" }
+serde = { version = "1.0", features = ["derive"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+reqwest = { version = "0.13", features = ["json"] }
+serde_json = "1.0"
+js-sys = "0.3"
+toml = "1.1"
+uuid = { version = "1.23", features = ["v4", "js"] }
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Location",
+    "Navigator",
+    "Clipboard",
+    "Storage",
+    "console",
+    "DragEvent",
+    "DataTransfer",
+    "Element",
+    "HtmlElement",
+    "DomRect",
+    "EventTarget",
+    "MediaQueryList",
+    "MediaQueryListEvent",
+    "Notification",
+    "NotificationOptions",
+    "NotificationPermission",
+    "Selection",
+    "Range",
+    "Document",
+    "HtmlDocument",
+    "HtmlInputElement"
+] }
+gloo-timers = { version = "0.4", features = ["futures"] }
+chrono = "0.4"
+base64 = "0.22.1"
+regex = "1.12"
+
+[dev-dependencies]
+any_spawner = "0.3"
+wasm-bindgen-test = "0.3"

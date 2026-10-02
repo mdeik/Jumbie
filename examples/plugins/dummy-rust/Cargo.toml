@@ -1,0 +1,20 @@
+[package]
+name = "dummy-plugin"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "dummy-plugin"
+path = "src/main.rs"
+
+[dependencies]
+plugin-sdk = { path = "../../../crates/plugin-sdk", features = ["server"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+schemars = "1.2"
+tokio = { version = "1.52", features = ["full"] }
+async-trait = "0.1"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }

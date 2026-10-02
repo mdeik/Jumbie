@@ -1,0 +1,37 @@
+# Jumbie — Optional Config Override
+# ===================================
+#
+# This file is **optional**. Jumbie works fine without it — baked-in defaults:
+#
+#                Database                 Plugins                    Logs
+#   Linux:       ~/.local/share/jumbie/    ~/.local/share/jumbie/    ~/.local/state/jumbie/
+#                  jumbie.db                 plugins                    logs
+#   macOS:       ~/Library/Application     ~/Library/Application     ~/Library/Logs/
+#                  Support/jumbie/           Support/jumbie/           jumbie
+#                  jumbie.db                 plugins
+#   Windows:     %APPDATA%/jumbie/           %APPDATA%/jumbie/          %LOCALAPPDATA%/jumbie/
+#                  jumbie.db                 plugins                      logs
+#   Docker:      /data/jumbie.db           /plugins                   /logs
+#
+# Temp directory (staging for unmatched files):
+#   Linux/macOS:  /tmp/jumbie        Docker:  /tmp/jumbie
+#   Windows:      %TEMP%\jumbie       Portable: <exe_dir>/tmp/jumbie
+#
+# Only define paths here to override. Relative paths resolve against the
+# executable's directory on every platform — for example, `jumbie/jumbie.db`
+# becomes `<exe_dir>/jumbie/jumbie.db` at runtime.
+#
+# For a fully relocatable setup (USB drives, network shares), create an empty
+# `portable.txt` next to the binary. All data stays next to the binary.
+#
+# ── Available fields (all optional) ────────────────────────────────────────
+#
+# database              = "jumbie/jumbie.db"       # SQLite database
+# unknown_files_tmp_dir = "tmp/jumbie"             # Staging for unmatched files
+# plugins_dir           = "jumbie/plugins"          # External plugin scripts
+# logs_dir              = "jumbie/logs"             # Log output
+#
+# Environment variables override everything (config file AND defaults) but are
+# never written back by the settings API:
+#   JUMBIE_DATABASE   JUMBIE_PLUGINS_DIR   JUMBIE_TMP_DIR
+#   JUMBIE_LOGS_DIR   JUMBIE_LOG_LEVEL     JUMBIE_PORT   JUMBIE_CONFIG

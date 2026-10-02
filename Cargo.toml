@@ -1,0 +1,27 @@
+[workspace]
+members = [
+    "backend", "crates/plugin-sdk",
+    "crates/shared",
+    "frontend",
+]
+exclude = [
+    "examples/plugins/dummy-rust",
+]
+# `cargo build`/`cargo test` at the workspace root should only build the native
+# crates. The frontend (Leptos) is compiled for wasm32 via `trunk` and building
+# it for the host target on every root-level cargo invocation is pure waste.
+# Build it explicitly with `-p jumbie_frontend --target wasm32-unknown-unknown`
+# or via trunk. CI passes `--workspace` explicitly, so it is unaffected.
+default-members = [
+    "backend",
+    "crates/plugin-sdk",
+    "crates/shared",
+]
+resolver = "2"
+
+# Faster local iteration: dev/test builds keep line numbers for backtraces but
+# skip full debug info, which is a large chunk of compile time and disk usage.
+# Release builds are untouched.
+[profile.dev]
+debug = "line-tables-only"
+

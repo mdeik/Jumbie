@@ -1,0 +1,105 @@
+name: Publish to Gitea Release
+description: Creates a Gitea release and uploads an asset (idempotent on re-runs)
+inputs:
+  asset:
+    description: Path to the asset file to upload
+    required: true
+  version:
+    description: Release version (semver, e.g. 0.1.0)
+    required: true
+  token:
+    description: Gitea token with release write access (secrets.GITHUB_TOKEN)
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        TAG="v$VERSION"
+        ASSET="${{ inputs.asset }}"
+        ASSET="${ASSET//$'\r'/}"  # strip carriage return (PowerShell GITHUB_OUTPUT on Windows)
+        ASSET_NAME="$(basename "$ASSET")"
+        BASE="https://api.github.com"
+        REPO="${{ github.repository }}"
+        TOKEN="${{ inputs.token }}"
+
+        if [ -z "$TOKEN" ]; then
+          echo "❌ Token is empty — pass a valid Gitea token (e.g. secrets.GITHUB_TOKEN)."
+          exit 1
+        fi
+
+        # Generate changelog from commits since last tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        if [ -n "$PREV_TAG" ]; then
+          CHANGELOG=$(git log --oneline --no-decorate "$PREV_TAG..HEAD" 2>/dev/null || echo "")
+        else
+          CHANGELOG=$(git log --oneline --no-decorate 2>/dev/null | head -50 || echo "")
+        fi
+        BODY=$(printf 'Release %s\n\n%s' "$VERSION" "${CHANGELOG:-No changes since initial release.}")
+
+        # Find a Python interpreter
+        # Windows: use 'py' launcher first (avoids Microsoft Store stub), then python3, then python
+        PYTHON=$(command -v py || command -v python3 || command -v python || echo '')
+        if [ -z "$PYTHON" ]; then
+          echo "❌ Python interpreter not found — required for JSON parsing."
+          exit 1
+        fi
+
+        # Build the JSON payload via Python (single-line -c avoids Windows Git Bash quoting issues)
+        export BODY TAG
+        PAYLOAD=$("$PYTHON" -c "import json, os; print(json.dumps({'tag_name': os.environ['TAG'], 'name': os.environ['TAG'], 'body': os.environ['BODY']}))") || {
+          rc=$?
+          echo "❌ Failed to build release JSON payload via Python (exit code $rc)"
+          exit 1
+        }
+
+        # Create release if it does not exist
+        REL=$(curl -sf -H "Authorization: Bearer $TOKEN" \
+          "$BASE/repos/$REPO/releases/tags/$TAG" || echo "null")
+        if [ "$REL" = "null" ] || [ -z "$REL" ]; then
+          REL=$(curl -sf -X POST "$BASE/repos/$REPO/releases" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" || echo '')
+          if [ -z "$REL" ]; then
+            echo '❌ Failed to create release — check token permissions and API availability'
+            exit 1
+          fi
+        fi
+
+        # Extract release ID
+        RID=$(echo "$REL" | "$PYTHON" -c "import sys,json; print(json.load(sys.stdin).get('id',''))" || echo '')
+        if [ -z "$RID" ]; then
+          echo '❌ Could not extract release ID from API response'
+          exit 1
+        fi
+
+        # Remove stale asset with the same name (idempotent re-runs)
+        ASSETS=$(curl -sf -H "Authorization: Bearer $TOKEN" \
+          "$BASE/repos/$REPO/releases/$RID/assets" || echo '')
+        export ASSET_NAME
+        PYSCRIPT=$(mktemp)
+        printf '%s\n' 'import json, os, sys' > "$PYSCRIPT"
+        printf '%s\n' 'data = json.load(sys.stdin)' >> "$PYSCRIPT"
+        printf '%s\n' 'name = os.environ.get("ASSET_NAME", "")' >> "$PYSCRIPT"
+        printf '%s\n' 'ids = [x["id"] for x in data if x["name"] == name]' >> "$PYSCRIPT"
+        printf '%s\n' 'print(ids[0] if ids else "")' >> "$PYSCRIPT"
+        AID=$(echo "$ASSETS" | "$PYTHON" "$PYSCRIPT") || echo ''
+        rm -f "$PYSCRIPT"
+        if [ -n "$AID" ]; then
+          curl -sf -X DELETE -H "Authorization: Bearer $TOKEN" \
+            "$BASE/repos/$REPO/releases/$RID/assets/$AID" || true
+        fi
+
+        # Upload
+        echo "Uploading $ASSET as $ASSET_NAME ..."
+        curl -sf -X POST \
+          "https://uploads.github.com/repos/$REPO/releases/$RID/assets?name=$ASSET_NAME" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/octet-stream" \
+          --data-binary "@$ASSET" || {
+          echo "❌ Upload failed (exit code: $?)"
+          exit 1
+        }
+        echo "✔ Uploaded $ASSET_NAME"

@@ -1,0 +1,4 @@
+{
+  "display_name": "Dummy Rust",
+  "executable": "./target/release/dummy-plugin"
+}

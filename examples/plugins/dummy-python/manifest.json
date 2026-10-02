@@ -1,0 +1,7 @@
+{
+  "display_name": "Dummy Python",
+  "category": "metadata",
+  "description": "A dummy Python plugin for testing IPC",
+  "executable": "run.py",
+  "version": "1.0.0"
+}

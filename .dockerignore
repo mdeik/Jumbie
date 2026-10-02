@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Rust build artifacts
+target/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Editor/IDE
+.vscode/
+.agents/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.yml
+.dockerignore
+
+# Docs (not needed for build)
+README.md
+ToDo.md
+docs/
+
+# Tests (not needed for build)
+tests/
+examples/
+
+# Logs / data / config (runtime stuff, not build-time)
+logs/
+data/
+config/
+
+# Cargo crate cache
+.cargo-chef/

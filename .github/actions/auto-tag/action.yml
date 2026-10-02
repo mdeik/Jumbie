@@ -1,0 +1,34 @@
+name: Auto-tag from Cargo.toml
+description: Creates or moves a v-prefixed git tag matching the version in backend/Cargo.toml
+inputs:
+  token:
+    description: Gitea token with push permission (secrets.GITHUB_TOKEN)
+    required: true
+runs:
+  using: composite
+  steps:
+    - id: tag
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.token }}
+      run: |
+        set -e
+
+        # Read version from Cargo.toml
+        VERSION=$(grep '^version =' backend/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+        TAG="v$VERSION"
+        COMMIT="${{ github.sha }}"
+
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+        # Configure git
+        git config user.name "github-actions"
+        git config user.email "actions@github.com"
+        git remote set-url origin "https://x-token:${TOKEN}@github.com/${{ github.repository }}.git"
+
+        # Force tag to the commit that triggered the workflow
+        git tag -f "$TAG" "$COMMIT"
+        git push --force origin "$TAG"
+
+        echo "✔ Tag $TAG moved to $COMMIT."

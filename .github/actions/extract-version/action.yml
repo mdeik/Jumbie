@@ -1,0 +1,14 @@
+name: Extract version from Cargo.toml
+description: Extracts the package version from backend/Cargo.toml and sets it as an output
+outputs:
+  version:
+    description: The version string from Cargo.toml
+    value: ${{ steps.extract.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: extract
+      shell: bash
+      run: |
+        VERSION=$(grep '^version =' backend/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"

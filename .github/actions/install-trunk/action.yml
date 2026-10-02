@@ -1,0 +1,21 @@
+name: Install Trunk
+description: Downloads and installs the Trunk WASM bundler
+inputs:
+  version:
+    description: Trunk release version (e.g. v0.21.14)
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        TRUNK_VERSION="${{ inputs.version }}"
+        # Skip the download if the pinned version is already installed
+        if command -v trunk >/dev/null 2>&1 && trunk --version | grep -q "\b${TRUNK_VERSION#v}\b"; then
+          echo "trunk ${TRUNK_VERSION#v} already installed, skipping"
+          exit 0
+        fi
+        ARCH="x86_64-unknown-linux-gnu"
+        wget -qO- "https://github.com/trunk-rs/trunk/releases/download/${TRUNK_VERSION}/trunk-${ARCH}.tar.gz" \
+          | tar -xzf-
+        mv trunk "$HOME/.cargo/bin/"

@@ -1,0 +1,115 @@
+[package]
+name = "jumbie"
+version = "1.0.0"
+license = "AGPL-3.0-only"
+description = "Jumbie is a lightweight, high-performance series organizer built in Rust."
+edition = "2024"
+default-run = "jumbie"
+
+[[bin]]
+name = "plugin-test-fixture"
+path = "src/bin/plugin_test_fixture.rs"
+test = false
+
+[lints.clippy]
+module_inception = "allow"
+# NOTE: the console-output SSoT lints (print_stdout / print_stderr / dbg_macro)
+# are declared as crate-root `deny` attributes in `src/lib.rs` and `src/main.rs`
+# under `cfg_attr(not(test), …)`. They are deliberately NOT set here: package
+# `[lints]` apply to every target (build script, integration tests), whereas the
+# crate-root form covers exactly the production lib/bin and exempts test code.
+
+[features]
+default = ["desktop"]
+# The desktop tray backend is platform-specific: Linux uses the Wayland-native
+# StatusNotifierItem implementation (ksni), everything else uses tray-icon/tao.
+# Both optional deps are declared per-target below; enabling them here is a no-op
+# on targets where they don't apply.
+desktop = ["dep:tray-icon", "dep:tao", "dep:ksni", "dep:open", "dep:image"]
+docker-defaults = ["jumbie_shared/docker-defaults"]
+
+[dependencies]
+jumbie_shared = { path = "../crates/shared", features = ["backend"], version = "0.1.0" }
+log = "0.4"
+# Used by both tray backends: opening the web UI and decoding the tray icon.
+open = { version = "5.3", optional = true }
+image = { version = "0.25", optional = true }
+rust-embed = "8.11"
+plugin-sdk = { path = "../crates/plugin-sdk", features = ["server"] }
+tokio = { version = "1.52", features = ["full"] }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls", "chrono", "macros", "migrate"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "1.1"
+config = "0.15"
+reqwest = { version = "0.13", features = ["json", "rustls", "cookies", "multipart", "form", "query"] }
+axum = { version = "0.8", features = ["macros"] }
+tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
+anyhow = "1.0"
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+sysinfo = "0.38"
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+clap = { version = "4.6", features = ["derive", "env"] }
+regex = "1.12"
+
+notify = "9.0.0-rc.4"
+futures = "0.3"
+url = "2.5"
+blake3 = "1.8"
+bytes = "1.11"
+quick-xml = { version = "0.39", features = ["serialize"] }
+
+async-trait = "0.1"
+walkdir = "2.5"
+xxhash-rust = { version = "0.8", features = ["xxh3", "std"] }
+base64 = "0.22.1"
+ipnet = "2"
+
+argon2 = { version = "0.6.0-rc.8", features = ["rand_core", "password-hash"] }
+
+tokio-util = "0.7.18"
+rand = "0.10"
+governor = "0.10"
+nonzero_ext = "0.3"
+uuid = { version = "1.23", features = ["v4"] }
+libc = "0.2"
+ring = "0.17"
+dunce = "1.0.5"
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+tikv-jemallocator = "0.6"
+tikv-jemalloc-sys = { version = "0.6", features = ["stats"] }
+tikv-jemalloc-ctl = { version = "0.6", features = ["stats"] }
+
+# GTK/appindicator tray stack — used everywhere except Linux, where it links
+# against libxdo and other X11 libraries even under Wayland.
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+tray-icon = { version = "0.24.0", optional = true }
+tao = { version = "0.30.7", optional = true }
+
+# Wayland-native system tray (freedesktop StatusNotifierItem over D-Bus).
+# Pure Rust via zbus — no GTK, no X11, no libxdo.
+#
+# `background_threads` forces `background_thread:true` into jemalloc's
+# malloc_conf. jemalloc only compiles that support for non-Mach-O ABIs (see
+# JEMALLOC_BACKGROUND_THREAD in its configure.ac), so on macOS it is a no-op
+# that makes jemalloc print "option background_thread currently supports
+# pthread only" at startup. Request it only where it actually works.
+[target.'cfg(target_os = "linux")'.dependencies]
+tikv-jemalloc-sys = { version = "0.6", features = ["background_threads"] }
+ksni = { version = "0.3.6", optional = true }
+
+[dev-dependencies]
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls", "chrono"] }
+tower = { version = "0.5", features = ["util", "make"] }
+http-body-util = "0.1"
+mime = "0.3"
+tempfile = "3.27"
+
+[build-dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+embed-resource = "3"

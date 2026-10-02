@@ -1,0 +1,6222 @@
+/* ==========================================================================
+   Jumbie — Frontend Styles
+   ==========================================================================
+   This stylesheet powers a Leptos CSR (WASM) single-page application for
+   managing TV series media. The design system uses CSS custom properties
+   for theming (dark/light/auto), with all colours, spacing, and transitions
+   defined in :root so the entire UI can be re-themed by overriding variables.
+
+   Table of Contents:
+   1.  CSS Custom Properties (Theme)     — :root, light, auto
+   2.  Reset & Base                      — *, html, body
+   3.  Layout                            — app-container, sidebar, header, content
+   4.  Sidebar Components                — brand, nav, badge, animations
+   5.  Cards & Stats                     — card, status-card
+   6.  Buttons                           — .btn and all variants
+   7.  Tables & Lists                    — table, th, td, list-group
+   8.  Form Elements                     — inputs, selects, checkboxes, toggles, aliases
+   9.  Episodes Grid & Season Accordion  — episode-cell, multiepisode, legend
+   10. Calendar                          — grid, events, list view
+   11. Modal / Bottom Sheet              — overlay, container, mobile drag
+   12. Info Sections, Badges, Media Info — status-badge, badge colours, media-info-grid
+   13. Edit Series View                  — tabs, action-row, season-config
+   14. Login Page                        — glass card, btn, layout
+   15. Tooltips                          — tooltip-host, help-icon, tooltip-content
+   16. Toast Notifications               — container, variants, progress bar
+   17. Skeleton / Shimmer Loading        — all skeleton classes
+   18. Loader & Empty States             — loader, empty-state, error-container
+   19. Search / Results                  — search-modal, results-table
+   20. Settings & Management Layouts     — settings-content, bulk-action, organized-series
+   21. System Pages                      — logs, health, rename, about
+   22. Authentication UI                 — api-keys, calendar tokens, auth table
+   23. Animation Keyframes               — @keyframes (all)
+   24. Scrollbar Styling                 — webkit scrollbar
+   25. Utility Classes                   — spacing, typography, layout, display
+   ========================================================================== */
+
+/* ==========================================================================
+   1. CSS Custom Properties (Theme)
+   ==========================================================================
+   All colours, spacing, transitions, and semantic aliases are defined here.
+   The :root block is the dark theme default. Light mode is activated either
+   by [data-theme="light"] or, when the theme is set to "auto", by a
+   @media (prefers-color-scheme: light) query.
+
+   WHY theme variables instead of a preprocessor:
+     CSS custom properties cascade and are dynamic — the theme can be switched
+     at runtime (e.g. via the UI) without a page reload or a build step.
+     They also compose: alpha variants use rgba() with the base colour values,
+     keeping the number of variables manageable.
+   ========================================================================== */
+
+:root {
+    /* ── Typography ─────────────────────────────────────────────────────── */
+    --font-base: 1rem;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-sans:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+        Arial, sans-serif;
+    --font-mono:
+        "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, monospace;
+
+    /* ── Surfaces (Dark Mode Default) ───────────────────────────────────── */
+    --bg-primary: #0f0f11;
+    --bg-secondary: #18181b;
+    --bg-tertiary: #27272a;
+    --bg-hover: #3f3f46;
+    --bg-active: #52525b;
+
+    /* ── Text ────────────────────────────────────────────────────────────── */
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+
+    /* ── Accent Colours ─────────────────────────────────────────────────── */
+    --accent-primary: #10b981;
+    --accent-secondary: #3b82f6;
+    --accent-warning: #f59e0b;
+    --accent-danger: #ef4444;
+    --accent-info: #06b6d4;
+
+    /* ── Borders & Radius ────────────────────────────────────────────────── */
+    --border-color: #27272a;
+    --border-radius: 0.5rem;
+
+    /* ── Spacing Scale ───────────────────────────────────────────────────── */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+
+    --mobile-footer-padding-bottom: calc(
+        var(--spacing-lg) + env(safe-area-inset-bottom, 1.5rem)
+    );
+
+    /* ── Layout Dimensions ───────────────────────────────────────────────── */
+    --header-height: 4rem;
+    --sidebar-width: 16rem;
+    --sidebar-mobile-width: 0rem;
+    --content-max-width: 87.5rem;
+
+    /* ── Transitions ─────────────────────────────────────────────────────── */
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ── Overlays & Special Surfaces ─────────────────────────────────────── */
+    --bg-overlay: rgba(0, 0, 0, 0.2);
+    --bg-calendar-other: rgba(24, 24, 27, 0.5);
+    --bg-search-input: var(--bg-primary);
+
+    /* ── Accent Alpha Variants (Dark Mode) ───────────────────────────────── */
+    --accent-primary-alpha-10: rgba(16, 185, 129, 0.1);
+    --accent-primary-alpha-15: rgba(16, 185, 129, 0.15);
+    --accent-primary-alpha-20: rgba(16, 185, 129, 0.2);
+    --accent-primary-alpha-25: rgba(16, 185, 129, 0.25);
+    --accent-primary-alpha-35: rgba(16, 185, 129, 0.35);
+    --accent-primary-hover: #059669;
+    --accent-primary-light: #34d399;
+
+    --accent-secondary-alpha-10: rgba(59, 130, 246, 0.1);
+    --accent-secondary-alpha-20: rgba(59, 130, 246, 0.2);
+    --accent-secondary-alpha-25: rgba(59, 130, 246, 0.25);
+    --accent-secondary-alpha-35: rgba(59, 130, 246, 0.35);
+    --accent-secondary-hover: #60a5fa;
+
+    --accent-danger-alpha-10: rgba(239, 68, 68, 0.1);
+    --accent-danger-alpha-15: rgba(239, 68, 68, 0.15);
+    --accent-danger-alpha-20: rgba(239, 68, 68, 0.2);
+    --accent-danger-alpha-25: rgba(239, 68, 68, 0.25);
+    --accent-danger-alpha-30: rgba(239, 68, 68, 0.3);
+    --accent-danger-hover: #dc2626;
+
+    --accent-warning-alpha-12: rgba(245, 158, 11, 0.12);
+    --accent-warning-alpha-20: rgba(245, 158, 11, 0.2);
+    --accent-warning-alpha-40: rgba(245, 158, 11, 0.4);
+    --accent-warning-hover: #d97706;
+
+    --accent-info-alpha-10: rgba(6, 182, 212, 0.1);
+    --accent-info-alpha-20: rgba(6, 182, 212, 0.2);
+    --accent-info-hover: #0592aa;
+
+    /* ── Black / White Alpha Variants ────────────────────────────────────── */
+    --black: #000;
+    --white: #ffffff;
+    --black-alpha-5: rgba(0, 0, 0, 0.05);
+    --black-alpha-6: rgba(0, 0, 0, 0.06);
+    --black-alpha-10: rgba(0, 0, 0, 0.1);
+    --black-alpha-15: rgba(0, 0, 0, 0.15);
+    --black-alpha-20: rgba(0, 0, 0, 0.2);
+    --black-alpha-30: rgba(0, 0, 0, 0.3);
+    --black-alpha-40: rgba(0, 0, 0, 0.4);
+    --black-alpha-50: rgba(0, 0, 0, 0.5);
+    --black-alpha-60: rgba(0, 0, 0, 0.6);
+    --black-alpha-80: rgba(0, 0, 0, 0.8);
+
+    --white-alpha-5: rgba(255, 255, 255, 0.05);
+    --white-alpha-20: rgba(255, 255, 255, 0.2);
+    --white-alpha-50: rgba(255, 255, 255, 0.5);
+    --white-alpha-70: rgba(255, 255, 255, 0.7);
+
+    /* ── Misc / Utility Alphas ───────────────────────────────────────────── */
+    --gray-alpha-20: rgba(75, 85, 99, 0.2);
+    --purple-alpha-20: rgba(168, 85, 247, 0.2);
+    --purple-hover: #c084fc;
+    --blue-alpha-10: rgba(69, 137, 255, 0.1);
+    --yellow-alpha-20: rgba(245, 237, 11, 0.2);
+    --yellow-hover: #f59e0b;
+    --orange-alpha-20: rgba(249, 115, 22, 0.2);
+    --orange-hover: #f97316;
+    --pink-alpha-20: rgba(249, 22, 234, 0.2);
+    --pink-hover: #f916ea;
+
+    /* ── Semantic Overlays (Theme-aware) ─────────────────────────────────── */
+    --overlay-subtle: var(--white-alpha-5);
+    --overlay-border: var(--white-alpha-20);
+    --overlay-icon: var(--white-alpha-50);
+    --overlay-text: var(--white-alpha-70);
+
+    /* ── Multi-episode Sequence Colours (Dark Mode) ─────────────────────── */
+    /* Used to colour individual episode cells within multi-episode ranges,
+       cycling through the rainbow so adjacent ranges are visually distinct. */
+    --multi-color-0: #ffffff;
+    --multi-color-1: #ef4444;
+    --multi-color-2: #f97316;
+    --multi-color-3: #f59e0b;
+    --multi-color-4: #eab308;
+    --multi-color-5: #84cc16;
+    --multi-color-6: #22c55e;
+    --multi-color-7: #10b981;
+    --multi-color-8: #14b8a6;
+    --multi-color-9: #06b6d4;
+    --multi-color-10: #0ea5e9;
+    --multi-color-11: #3b82f6;
+    --multi-color-12: #6366f1;
+    --multi-color-13: #8b5cf6;
+    --multi-color-14: #a855f7;
+    --multi-color-15: #d946ef;
+    --multi-color-16: #ec4899;
+    --multi-color-17: #f43f5e;
+
+    /* ── Surface / Border / Shadow Aliases ───────────────────────────────── */
+    /* These map onto the design system variables above so that components
+       referencing them work without silent fallbacks to browser defaults. */
+    --surface: var(--bg-secondary);
+    --surface-hover: var(--bg-hover);
+    --bg-modifier-hover: var(--bg-tertiary);
+    --border: var(--border-color);
+    --danger: var(--accent-danger);
+    --radius-sm: 0.25rem;
+    --radius-md: var(--border-radius);
+    /* 0.5rem */
+    --gap-xs: var(--spacing-xs);
+    --gap-sm: var(--spacing-sm);
+    --gap-md: var(--spacing-md);
+    --gap-lg: var(--spacing-lg);
+    --gap-xl: var(--spacing-xl);
+    --shadow-sm: 0 0.125rem 0.25rem var(--black-alpha-10);
+
+    /* ── Monitored Episode Cell Stripe (overlaid on status background) ──── */
+    --monitored-stripe: rgba(255, 255, 255, 0.08);
+
+    /* ── Extra Alpha Variants (referenced by pulse animations) ───────────── */
+    --accent-primary-alpha-50: rgba(16, 185, 129, 0.5);
+    --accent-warning-alpha-50: rgba(245, 158, 11, 0.5);
+    --accent-info-alpha-15: rgba(6, 182, 212, 0.15);
+    --accent-warning-alpha-15: rgba(245, 158, 11, 0.15);
+
+    /* ── Min Screen Width ────────────────────────────────────────────────── */
+    --min-screen-width: 315px;
+}
+
+/* ── Light Mode (explicit) ──────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+    --bg-primary: #eaeaec;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f4f4f5;
+    --bg-hover: #e4e4e7;
+    --bg-active: #d4d4d8;
+
+    --text-primary: #18181b;
+    --text-secondary: #3f3f46;
+    --text-muted: #71717a;
+
+    --border-color: #c4c4c7;
+
+    /* ── Accent Colours (Light Mode) ──────────────────────────────────────── */
+    --accent-primary: #34d399;
+    --accent-primary-alpha-10: rgba(52, 211, 153, 0.1);
+    --accent-primary-alpha-15: rgba(52, 211, 153, 0.15);
+    --accent-primary-alpha-20: rgba(52, 211, 153, 0.2);
+    --accent-primary-hover: #2aa97a;
+    --accent-info: #08a5eb;
+    --accent-info-alpha-10: rgba(8, 165, 235, 0.1);
+    --accent-info-alpha-15: rgba(8, 165, 235, 0.15);
+    --accent-info-alpha-20: rgba(8, 165, 235, 0.2);
+    --accent-info-hover: #078cc8;
+
+    --bg-overlay: #dfdddd17;
+    --bg-calendar-other: var(--bg-hover);
+    --bg-search-input: #ebebeb;
+
+    /* Semantic Overlays (Light Mode) */
+    --overlay-subtle: var(--black-alpha-5);
+    --overlay-border: var(--black-alpha-15);
+    --overlay-icon: var(--black-alpha-40);
+    --overlay-text: var(--black-alpha-60);
+
+    /* Monitored Episode Cell Stripe (Light Mode) */
+    --monitored-stripe: rgba(0, 0, 0, 0.06);
+
+    /* Multi-episode Sequence Colours (Light Mode — darker, higher contrast)  */
+    --multi-color-0: #000000;
+    --multi-color-1: #b91c1c;
+    --multi-color-2: #c2410c;
+    --multi-color-3: #b45309;
+    --multi-color-4: #a16207;
+    --multi-color-5: #4d7c0f;
+    --multi-color-6: #15803d;
+    --multi-color-7: #047857;
+    --multi-color-8: #0f766e;
+    --multi-color-9: #0e7490;
+    --multi-color-10: #0369a1;
+    --multi-color-11: #1d4ed8;
+    --multi-color-12: #4338ca;
+    --multi-color-13: #6d28d9;
+    --multi-color-14: #7e22ce;
+    --multi-color-15: #a21caf;
+    --multi-color-16: #be185d;
+    --multi-color-17: #be123c;
+}
+
+/* ── Light Mode (auto / system preference) ─────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+    :root[data-theme="auto"],
+    :root:not([data-theme]) {
+        --bg-primary: #eaeaec;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #f4f4f5;
+        --bg-hover: #e4e4e7;
+        --bg-active: #d4d4d8;
+
+        --text-primary: #18181b;
+        --text-secondary: #3f3f46;
+        --text-muted: #71717a;
+
+        --border-color: #c4c4c7;
+
+        /* ── Accent Colours (Light Mode) ──────────────────────────────────── */
+        --accent-primary: #34d399;
+        --accent-primary-alpha-10: rgba(52, 211, 153, 0.1);
+        --accent-primary-alpha-15: rgba(52, 211, 153, 0.15);
+        --accent-primary-alpha-20: rgba(52, 211, 153, 0.2);
+        --accent-primary-hover: #2aa97a;
+        --accent-info: #08a5eb;
+        --accent-info-alpha-10: rgba(8, 165, 235, 0.1);
+        --accent-info-alpha-15: rgba(8, 165, 235, 0.15);
+        --accent-info-alpha-20: rgba(8, 165, 235, 0.2);
+        --accent-info-hover: #078cc8;
+
+        --bg-overlay: #dfdddd17;
+        --bg-calendar-other: var(--bg-hover);
+        --bg-search-input: #ebebeb;
+
+        /* Monitored Episode Cell Stripe (Light Mode) */
+        --monitored-stripe: rgba(0, 0, 0, 0.06);
+
+        /* Multi-episode Sequence Colours (Light Mode Fallback) */
+        --multi-color-0: #000000;
+        --multi-color-1: #b91c1c;
+        --multi-color-2: #c2410c;
+        --multi-color-3: #b45309;
+        --multi-color-4: #a16207;
+        --multi-color-5: #4d7c0f;
+        --multi-color-6: #15803d;
+        --multi-color-7: #047857;
+        --multi-color-8: #0f766e;
+        --multi-color-9: #0e7490;
+        --multi-color-10: #0369a1;
+        --multi-color-11: #1d4ed8;
+        --multi-color-12: #4338ca;
+        --multi-color-13: #6d28d9;
+        --multi-color-14: #7e22ce;
+        --multi-color-15: #a21caf;
+        --multi-color-16: #be185d;
+        --multi-color-17: #be123c;
+    }
+}
+
+/* ==========================================================================
+   2. Reset & Base
+   ==========================================================================
+   Minimal CSS reset: remove default margins/padding, use border-box so that
+   padding doesn't inflate element widths, and set a base font-size on html
+   so all rem values are predictable.
+   ========================================================================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+svg {
+    display: block;
+}
+.managed-folder-name svg {
+    display: inline;
+    vertical-align: middle;
+}
+
+html {
+    font-size: var(--font-base);
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    overflow: hidden;
+    min-width: var(--min-screen-width);
+    overflow-x: auto;
+}
+
+/* ==========================================================================
+   3. Layout — App Container, Sidebar, Header, Content
+   ==========================================================================
+   The root layout is a horizontal flex container: sidebar on the left, main
+   content area filling the rest. On mobile (< 946px) the sidebar becomes a
+   slide-out drawer overlaid on the content.
+   ========================================================================== */
+
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+/* ── Main Content ──────────────────────────────────────────────────────────── */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Header Bar ────────────────────────────────────────────────────────────── */
+.header {
+    height: var(--header-height);
+    background-color: var(--bg-secondary);
+    border-bottom: 0.0625rem solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--spacing-md);
+}
+
+@media (min-width: 946px) {
+    .header {
+        padding: 0 var(--spacing-xl);
+    }
+}
+
+.header-title {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.header-left {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.header-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: center;
+}
+
+/* ── Content Area ──────────────────────────────────────────────────────────── */
+.content {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding: var(--spacing-md);
+    position: relative;
+    width: 100%;
+}
+
+@media (min-width: 946px) {
+    .content {
+        padding: var(--spacing-xl);
+    }
+}
+
+.max-w-content {
+    max-width: var(--content-max-width);
+    margin: 0 auto;
+}
+
+/* ── Menu Toggle (Mobile Hamburger) ────────────────────────────────────────── */
+.menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: var(--font-size-2xl);
+    cursor: pointer;
+    padding: var(--spacing-sm);
+    margin-right: var(--spacing-sm);
+}
+
+@media (max-width: 946px) {
+    .menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+/* ── Settings & Management Content Layouts ──────────────────────────────────── */
+.settings-content {
+    max-width: var(--content-max-width);
+    margin: 0 auto;
+    width: 100%;
+}
+
+.page-header-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: var(--spacing-xl);
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+}
+
+.settings-page-description {
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+    max-width: 45rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-sm);
+}
+
+.settings-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+}
+
+.settings-section {
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-xl);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+}
+
+.settings-section h3 {
+    margin-bottom: var(--spacing-lg);
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 0.0625rem solid var(--border-color);
+    padding-bottom: var(--spacing-sm);
+    letter-spacing: -0.01em;
+}
+
+.settings-fields-grid {
+    display: flex;
+    margin-top: var(--spacing-md);
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+/* ── Bulk Action Footer (fixed to bottom during batch operations) ──────────── */
+.bulk-action-footer {
+    position: fixed;
+    bottom: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    background-color: var(--bg-secondary);
+    border-top: 0.0625rem solid var(--border-color);
+    padding: var(--spacing-md) var(--spacing-xl);
+    z-index: 50;
+    box-shadow: 0 -0.25rem 0.75rem var(--black-alpha-20);
+}
+
+.bulk-selectors .form-select {
+    text-align: center;
+}
+
+@media (max-width: 946px) {
+    .bulk-action-footer {
+        left: 0;
+        padding: var(--spacing-md);
+        padding-bottom: var(--mobile-footer-padding-bottom);
+    }
+
+    .bulk-fields-col {
+        flex-direction: column;
+        align-items: flex-start;
+        flex: 1;
+        min-width: 0;
+        gap: var(--spacing-xs);
+    }
+
+    .bulk-actions-col {
+        flex-direction: column;
+        align-items: stretch;
+        flex-shrink: 0;
+        gap: var(--spacing-xs);
+    }
+
+    .bulk-selectors {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        gap: var(--spacing-xs);
+    }
+
+    .bulk-selectors .form-select {
+        width: 100%;
+    }
+}
+
+/* ── Organized Series Footer (mobile) ──────────────────────────────────
+   The organized series footer has 5 action buttons (Add/Remove/Move/Delete
+   + divider). On mobile, use a compact 2-column grid instead of a tall
+   single column. The divider is hidden since the grid visually separates
+   the two groups. Selection count stacks above the buttons. */
+.organized-series-footer .bulk-actions-col {
+    flex-shrink: 0;
+}
+
+.selection-count {
+    align-content: center;
+}
+
+@media (max-width: 946px) {
+    .organized-series-footer .bulk-action-content {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+    }
+
+    .organized-series-footer .selection-count {
+        text-align: center;
+        width: 100%;
+    }
+
+    .organized-series-footer .bulk-actions-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: stretch;
+        flex-shrink: 0;
+    }
+
+    .organized-series-footer .bulk-actions-col .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .organized-series-footer .divider-vertical {
+        display: none !important;
+    }
+}
+
+/* ── Destination Root Add Row (mobile) ─────────────────────────────────
+   The path input and "Add Root" button share a row on desktop; on mobile
+   they stack and each spans the full width so the field isn't cramped. */
+@media (max-width: 946px) {
+    .dest-root-add-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .dest-root-add-row > .form-control,
+    .dest-root-add-row > .btn {
+        width: 100%;
+        flex: none;
+    }
+}
+
+.bulk-selectors .form-group {
+    margin-bottom: 0;
+}
+
+.bulk-action-content {
+    width: 100%;
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+}
+
+.bulk-actions-col {
+    flex-shrink: 0;
+}
+
+/* Extra bottom margin when the fixed bulk-action-footer is visible
+   so the footer doesn't overlap content at the bottom of the page. */
+.mb-footer {
+    margin-bottom: 8rem;
+}
+
+@media (max-width: 930px) {
+    .mb-footer {
+        margin-bottom: 13rem;
+    }
+}
+
+@media (max-width: 946px) {
+    /* Assign controls (season/episode/multipart) on the top row */
+    #modal-footer--manage-series-files > :nth-child(2) {
+        order: -1;
+        width: 100%;
+    }
+
+    /* Flatten button wrappers so all 4 buttons flow in a single row below */
+    #modal-footer--manage-series-files > :nth-child(1),
+    #modal-footer--manage-series-files > :nth-child(3) {
+        display: contents;
+    }
+
+    /* Buttons stretch evenly within the row */
+    #modal-footer--manage-series-files > :nth-child(1) > button,
+    #modal-footer--manage-series-files > :nth-child(3) > button {
+        flex: 1;
+    }
+
+    #modal-footer--manage-series-files {
+        justify-content: center;
+    }
+
+    /* Compact selection count */
+    #modal-footer--manage-series-files .text-sm {
+        font-size: var(--font-base);
+    }
+
+    /* Tighter gaps between assign inputs */
+    #modal-footer--manage-series-files .flex.gap-sm {
+        gap: var(--spacing-xs);
+    }
+
+    /* Larger inputs for mobile tap targets */
+    #modal-footer--manage-series-files .input-assign-season,
+    #modal-footer--manage-series-files .input-assign-episode {
+        width: 3.5rem;
+    }
+
+    /* Reduce button min-widths so they fit compactly on narrow screens */
+    #modal-footer--manage-series-files .modal-footer-btn--wide {
+        min-width: 5.5rem;
+    }
+    #modal-footer--manage-series-files .modal-footer-btn--narrow {
+        min-width: 4rem;
+    }
+}
+
+@media (max-width: 350px) {
+    #modal-footer--manage-series-files {
+        flex-direction: column;
+    }
+    #modal-footer--manage-series-files .btn {
+        flex: 1;
+    }
+}
+
+@media (max-width: 946px) {
+    .episode-details-footer {
+        flex-direction: column;
+    }
+    .episode-details-footer .btn {
+        flex: 1;
+    }
+}
+@media (max-width: 416px) {
+    .episode-details-footer .flex {
+        flex-direction: column;
+    }
+}
+/* ==========================================================================
+   4. Sidebar Components
+   ==========================================================================
+   The sidebar contains the brand header, navigation sections with labelled
+   groups, nav items with icons and badges, and a collapsed state for mobile.
+   ========================================================================== */
+
+.sidebar {
+    width: var(--sidebar-width);
+    background-color: var(--bg-secondary);
+    border-right: 0.0625rem solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: var(--transition-slow);
+    z-index: 100;
+}
+
+.sidebar.collapsed {
+    width: 0;
+    overflow: hidden;
+    border-right: none;
+    transform: translateX(-100%);
+}
+
+/* ── Sidebar Overlay (mobile backdrop) ──────────────────────────────────────── */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--black-alpha-50);
+    z-index: 90;
+}
+
+/* ── Mobile Sidebar (slide-out drawer) ──────────────────────────────────────── */
+@media (max-width: 946px) {
+    .sidebar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 18rem;
+        transform: translateX(-100%);
+        box-shadow: 0.5rem 0 1.5rem rgba(0, 0, 0, 0.5);
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+}
+
+/* ── Brand / Logo Area ─────────────────────────────────────────────────────── */
+.brand {
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--spacing-lg);
+    border-bottom: 0.0625rem solid var(--border-color);
+    gap: var(--spacing-md);
+}
+
+.brand-icon {
+    width: 2rem;
+    height: 2rem;
+    background: linear-gradient(
+        135deg,
+        var(--accent-primary),
+        var(--accent-secondary)
+    );
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: var(--font-size-lg);
+    box-shadow: 0 0.25rem 0.75rem var(--accent-primary-alpha-20);
+    /* Unselectable */
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and Edge */
+    user-select: none; /* Modern standard browsers */
+}
+
+.brand-text {
+    font-weight: 600;
+    font-size: var(--font-size-lg);
+    letter-spacing: -0.025em;
+}
+
+/* ── Navigation ─────────────────────────────────────────────────────────────── */
+.nav-section {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-md) 0;
+}
+
+.nav-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.nav-label {
+    padding: 0 var(--spacing-lg);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-sm);
+    font-weight: 600;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    margin: 0 var(--spacing-sm);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease;
+    gap: var(--spacing-md);
+    color: var(--text-secondary);
+    text-decoration: none;
+    border: none;
+    background: none;
+    width: calc(100% - var(--spacing-md));
+    font-family: inherit;
+    font-size: inherit;
+    text-align: left;
+    position: relative;
+}
+
+.nav-item.active {
+    background-color: var(--bg-tertiary);
+    color: var(--accent-primary);
+    font-weight: 500;
+}
+
+/* Active indicator bar — a thin accent-coloured bar on the left edge */
+.nav-item.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0.1875rem;
+    height: 1.5rem;
+    background-color: var(--accent-primary);
+    border-radius: 0 0.125rem 0.125rem 0;
+}
+
+/* ── Nav Icon ──────────────────────────────────────────────────────────────── */
+.nav-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    opacity: 0.7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s ease;
+}
+
+.nav-item.active .nav-icon {
+    opacity: 1;
+}
+
+@keyframes icon-pop {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.15);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.nav-item.active .nav-icon svg {
+    animation: icon-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    fill: currentColor;
+}
+
+.nav-item.active .nav-icon .dot-icon circle {
+    fill: currentColor;
+}
+
+/* ── Breathing Danger Animation (used for critical alerts in the sidebar) ───── */
+@keyframes sys-breathe-danger {
+    0% {
+        opacity: 0.4;
+        filter: drop-shadow(0 0 0.125rem var(--accent-danger-alpha-30));
+    }
+
+    50% {
+        opacity: 1;
+        filter: drop-shadow(0 0 0.5rem var(--accent-danger));
+    }
+
+    100% {
+        opacity: 0.4;
+        filter: drop-shadow(0 0 0.125rem var(--accent-danger-alpha-30));
+    }
+}
+
+.sys-breathing-danger {
+    animation: sys-breathe-danger 2s ease-in-out infinite;
+    color: var(--accent-danger) !important;
+}
+
+/* ==========================================================================
+   5. Cards & Stats
+   ==========================================================================
+   Generic card containers and status cards used on dashboards and
+   system status pages.
+   ========================================================================== */
+
+.card {
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    transition: var(--transition);
+    overflow-wrap: break-word;
+}
+
+/* ── Status Cards (used in system health / profiles) ────────────────────────── */
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.status-card {
+    background-color: var(--bg-tertiary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    transition: var(--transition);
+    /* Unselectable */
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and Edge */
+    user-select: none; /* Modern standard browsers */
+}
+
+#status .status-card {
+    -webkit-user-select: text; /* Safari */
+    -ms-user-select: text; /* IE 10 and Edge */
+    user-select: text; /* Modern standard browsers */
+}
+
+.status-card .label {
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.status-card .value {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.status-card.clickable {
+    cursor: pointer;
+}
+
+/* ==========================================================================
+   6. Buttons
+   ==========================================================================
+   Base .btn with semantic variants: primary, secondary, danger, ghost, search.
+   Sizes: default, .btn-sm, .btn-icon. Mobile overrides ensure minimum 44px
+   touch targets (WCAG 2.1 Success Criterion 2.5.5).
+   ========================================================================== */
+
+.btn {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-sm);
+    --btn-pad-y: var(--spacing-sm);
+    --btn-pad-x: var(--spacing-md);
+    border-radius: var(--border-radius);
+    border: 0.0625rem solid transparent;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
+    font-family: inherit;
+    text-align: center;
+    word-break: normal;
+    overflow-wrap: break-word;
+    justify-content: center;
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and Edge */
+    user-select: none; /* Modern standard browsers */
+}
+
+@media (max-width: 946px) {
+    .btn {
+        --btn-pad-y: 0.75rem;
+        --btn-pad-x: 1.25rem;
+        height: 2.75rem;
+        /* 44px equivalent */
+    }
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+/* ── Button Variants ────────────────────────────────────────────────────────── */
+.btn-primary {
+    background-color: var(--accent-primary);
+    color: var(--black);
+    box-shadow: 0 0.25rem 0.75rem var(--accent-primary-alpha-25);
+}
+
+.btn-primary:disabled,
+.btn-primary.disabled,
+.btn-secondary:disabled,
+.btn-secondary.disabled,
+.btn-danger:disabled,
+.btn-danger.disabled,
+.btn-warning:disabled,
+.btn-warning.disabled {
+    background-color: var(--bg-tertiary);
+    color: var(--text-muted);
+    box-shadow: none;
+    border-color: transparent;
+    cursor: not-allowed;
+}
+
+.btn.status-badge:disabled,
+.btn.status-badge.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background-color: var(--accent-secondary);
+    color: var(--white);
+    box-shadow: 0 0.25rem 0.75rem var(--accent-secondary-alpha-25);
+}
+
+.btn-ghost {
+    background-color: transparent;
+    border-color: var(--border-color);
+}
+
+@media (max-width: 946px) {
+    .btn-ghost {
+        background-color: var(--bg-tertiary);
+        border-color: var(--border-color);
+    }
+}
+
+.btn-danger {
+    background-color: var(--accent-danger-alpha-10);
+    color: var(--accent-danger);
+    border: 0.0625rem solid var(--accent-danger-alpha-20);
+    box-shadow: none;
+    border-radius: var(--border-radius);
+}
+
+.btn-reveal {
+    min-width: 5rem;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.btn-calendar-link {
+    width: 6rem;
+    justify-content: center;
+}
+
+@media (max-width: 946px) {
+    .btn-reveal,
+    .btn-calendar-link {
+        width: 50%;
+    }
+}
+
+.bg-info-white {
+    background: var(--accent-info);
+    color: var(--white);
+}
+
+/* ── Button Sizes ───────────────────────────────────────────────────────────── */
+/* Padding is token-driven: the size classes below and the responsive breakpoints
+   only change the `--btn-pad-*` tokens, while the physical padding is declared
+   once here. This lets a breakpoint make `.btn-sm` fall back to the default size
+   without restating the padding values. (`.btn-action`/`.btn-arrow` keep their
+   own bespoke padding deliberately.) */
+.btn,
+.btn-sm,
+.btn-md,
+.btn-icon {
+    padding: var(--btn-pad-y) var(--btn-pad-x);
+}
+
+.btn-pair {
+    min-width: 5rem;
+    justify-content: center;
+}
+
+.btn-pair-l {
+    margin-right: var(--spacing-sm);
+}
+
+.btn-sm {
+    --btn-pad-y: var(--spacing-xs);
+    --btn-pad-x: 0.75rem;
+}
+.btn-md {
+    --btn-pad-y: var(--spacing-sm);
+    --btn-pad-x: 1rem;
+}
+
+@media (max-width: 946px) {
+    .btn-sm,
+    .btn-md {
+        --btn-pad-y: 0.5rem;
+        --btn-pad-x: 1rem;
+        min-height: 2.5rem;
+        /* 40px equivalent */
+    }
+}
+
+.btn-icon {
+    --btn-pad-y: var(--spacing-sm);
+    --btn-pad-x: var(--spacing-sm);
+}
+
+@media (max-width: 946px) {
+    .btn-icon {
+        --btn-pad-y: 1rem;
+        --btn-pad-x: 1rem;
+    }
+}
+
+.btn-action {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    color: var(--accent-primary);
+}
+
+@media (max-width: 946px) {
+    .btn-action {
+        padding: 0.5rem 0.75rem;
+        min-height: 2.5rem;
+    }
+}
+
+/* ── Arrow Buttons (season navigation) ──────────────────────────────────────── */
+.btn-arrow {
+    background: var(--bg-tertiary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.125rem 0.375rem;
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+@media (max-width: 946px) {
+    .btn-arrow {
+        padding: var(--spacing-sm) var(--spacing-md);
+        font-size: var(--font-base);
+        min-width: 2.75rem;
+        min-height: 2.5rem;
+    }
+}
+
+.btn-dl-action {
+    width: 4.7rem;
+}
+
+@media (max-width: 946px) {
+    .btn-dl-action {
+        flex: 1;
+    }
+}
+
+.metadata-actions-provider {
+    margin-top: var(--spacing-md);
+}
+
+.metadata-actions-buttons {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+@media (max-width: 946px) {
+    .metadata-actions-buttons .btn {
+        flex: 1;
+    }
+}
+
+/* ── Table Buttons (For Rows) ───────────────────────────────────────────────── */
+
+/* ==========================================================================
+   7. Tables & Lists
+   ==========================================================================
+   Standard data tables with sticky headers, hover states, and responsive
+   overflow. Also includes list-group items.
+   ========================================================================== */
+
+/* ── Table Row Buttons ─────────────────────────────────────────────────────── */
+td:has(button) {
+    text-align: right;
+}
+
+/* ── Table Container ───────────────────────────────────────────────────────── */
+.table-container {
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow:
+        0 0.25rem 0.375rem -0.0625rem var(--black-alpha-10),
+        0 0.125rem 0.25rem -0.0625rem var(--black-alpha-6);
+}
+
+.table-container .table-header {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 0.0625rem solid var(--border-color);
+    background-color: var(--bg-overlay);
+}
+
+.table-header {
+    display: flex;
+    padding-bottom: var(--spacing-md);
+    justify-content: space-between;
+    align-items: center;
+}
+
+.table-header .form-group {
+    margin-bottom: 0;
+}
+
+@media (max-width: 946px) {
+    .table-container .table-header,
+    .table-container {
+        background-color: transparent;
+        padding: 0;
+        border: none;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+    .table-header {
+        padding: var(--spacing-sm) 0;
+        background-color: transparent;
+        border-bottom: none;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-md);
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    text-align: left;
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 0.0625rem solid var(--border-color);
+    background-color: var(--bg-secondary);
+    white-space: nowrap;
+}
+
+td {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 0.0625rem solid var(--border-color);
+    color: var(--text-primary);
+}
+
+tr {
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+/* Header rows are not interactive. */
+tr:has(th) {
+    cursor: default;
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+/* Narrow/tablet range: columns are compressed enough that values often wrap to
+   two lines, so give data rows a ~two-line minimum height for a consistent
+   rhythm. (Below 946px most tables become cards, so in practice this targets
+   the ~947–1200px band.) Small buttons also fall back to the default sizing
+   here instead of the compact `.btn-sm` padding. */
+@media (max-width: 1200px) {
+    .btn-sm {
+        --btn-pad-y: var(--spacing-sm);
+        --btn-pad-x: var(--spacing-md);
+    }
+
+    tbody tr {
+        height: 4.5rem;
+    }
+}
+
+/* ── TableBuilder empty-state sentinel (hidden when real data follows) ──────── */
+tr.table-empty-sentinel:not(:last-child) {
+    display: none !important;
+}
+
+tr.table-empty-sentinel {
+    cursor: default;
+}
+
+.mobile-only:has(.card) .table-empty-sentinel {
+    display: none !important;
+}
+
+/* ── Responsive Table Wrapper ───────────────────────────────────────────────── */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Fixed layout gives every column a definite width, which is what lets
+   `.truncate` inside a cell actually engage instead of the table growing. */
+.table-fixed {
+    table-layout: fixed;
+}
+
+.modal-full .table-responsive {
+    min-height: 20rem;
+}
+
+.table-actions {
+    flex-shrink: 0;
+}
+
+@media (max-width: 946px) {
+    .table-actions {
+        width: 100%;
+        display: flex;
+        gap: var(--spacing-sm);
+    }
+
+    .table-actions .btn {
+        flex: 1;
+    }
+}
+
+.managed-table-wrapper {
+    width: 100%;
+}
+
+.managed-folder-name {
+    display: inline-block;
+    align-items: center;
+    gap: var(--spacing-xs);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+
+.managed-folder-name svg {
+    margin-right: var(--spacing-sm);
+}
+
+.mobile-sort-bar {
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    border: 0.0625rem solid var(--border-color);
+    padding: var(--spacing-sm);
+}
+
+.season-display {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.cell-quality {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--accent-secondary);
+    font-weight: 600;
+}
+
+/* ── Manage Episodes Modal Table ────────────────────────────────────────────── */
+.manage-table-container {
+    overflow-y: auto;
+    border-radius: 0;
+}
+
+.col-checkbox {
+    width: 2.5rem;
+}
+
+/* ── Action columns ────────────────────────────────────────────────────────
+   Single source of truth for table action columns: width plus right-aligned
+   header/body content. Alignment is CSS-driven rather than `display:flex` on
+   the <td>, which would drop `table-cell` and break vertical alignment. */
+.col-actions {
+    width: 5rem;
+    white-space: nowrap;
+}
+
+/* Right-align the header label via its existing inner flex wrapper. */
+th.col-actions > div {
+    justify-content: flex-end;
+}
+
+/* Right-align body content. Buttons are inline-block; grouped controls use
+   `.action-cell` (inline-flex) so this text-align positions the whole group. */
+td.col-actions {
+    text-align: right;
+}
+
+/* Shared layout for grouped action controls (e.g. several buttons). */
+.action-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.col-size {
+    width: 7.2rem;
+}
+
+.col-score {
+    flex: none;
+    flex-basis: 8.75rem;
+}
+
+.card-list {
+    /* Unselectable */
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and Edge */
+    user-select: none; /* Modern standard browsers */
+}
+
+/* Defensive containment for mobile card views: if a field ever lacks an
+   explicit `truncate`, it is still clipped at the card's rounded edge instead
+   of painting outside it. Scoped to `.mobile-only` (the wrapper every table's
+   mobile view renders into) because ordinary `.card`s can host HelpIcon
+   tooltips that must be free to overflow. */
+.mobile-only .card {
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* ── List Group ─────────────────────────────────────────────────────────────── */
+.list-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-xs);
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.list-group-item {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 0.0625rem solid var(--border-color);
+    transition: all var(--transition-fast);
+    text-align: center;
+    align-items: center;
+    display: flex;
+    gap: var(--gap-md);
+}
+
+@media (max-width: 946px) {
+    .list-group-item {
+        display: grid;
+        gap: var(--spacing-md);
+    }
+}
+
+/* ── Draggable List (for reordering items) ──────────────────────────────────── */
+.draggable-list {
+    margin-bottom: var(--spacing-lg);
+    margin-top: 1.25rem;
+    border: 0.0625rem solid var(--border-color);
+    border-radius: 0.375rem;
+    overflow: hidden;
+}
+
+.draggable-list-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem var(--spacing-md);
+    background: var(--bg-primary);
+    border-bottom: 0.0625rem solid var(--border-color);
+    cursor: grab;
+}
+
+.drag-handle-icon {
+    cursor: grab;
+    margin-right: var(--spacing-md);
+    opacity: 0.5;
+}
+
+.drag-item-label {
+    flex: 1;
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   8. Form Elements
+   ==========================================================================
+   Inputs, selects, textareas, checkboxes, toggles, alias tags, and their
+   validation states. All form controls share consistent spacing and
+   focus rings.
+   ========================================================================== */
+
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.draggable-list-item .form-group {
+    margin: 0;
+}
+
+@media (max-width: 480px) {
+    #release-date-display-list .form-check .form-check-label {
+        display: none;
+    }
+}
+
+.form-input-below {
+    margin-bottom: var(--spacing-md);
+}
+
+.form-input-below .form-group {
+    margin-bottom: 0;
+}
+
+.form-row {
+    margin-bottom: var(--spacing-xl);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.form-row .form-group {
+    margin-bottom: 0;
+}
+
+#auto-apply-renames-container .form-group {
+    margin-bottom: 0;
+}
+
+/* The "Apply All" button shares a row with the checkbox on desktop; only the
+   stacked mobile header needs the extra top spacing (see `.table-header`). */
+@media (max-width: 946px) {
+    #apply-all-renames-btn {
+        margin-top: var(--spacing-md);
+    }
+}
+
+#format-settings-row {
+    grid-template-columns: repeat(2, minmax(1rem, 1fr));
+}
+
+.form-field-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.form-field-wrapper .form-field-input-flex,
+.form-field-input-flex {
+    flex: 1;
+    padding-right: 2.5rem;
+    /* Make room for the icon button */
+}
+
+.form-field-wrapper .form-field-icon-right {
+    position: absolute;
+    right: 0.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0.375rem;
+    color: var(--text-muted);
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: var(--border-radius);
+    transition: color 0.2s ease;
+}
+
+.form-group.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+.form-hint {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    white-space: pre-line;
+}
+
+h3 .form-hint {
+    margin-left: var(--spacing-sm);
+}
+
+.form-group .form-hint,
+.checkbox-group .form-hint {
+    margin-top: var(--spacing-xs);
+}
+
+/* ── Form Fields (dedicated icon-right variant from form_fields.rs) ─────────── */
+.form-field-icon-right {
+    position: absolute;
+    right: 0.375rem;
+    padding: 0.3rem;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--text-muted);
+    opacity: 0.7;
+    border-radius: var(--border-radius);
+    transition:
+        opacity 0.2s ease,
+        color 0.2s ease,
+        background-color 0.2s ease;
+    line-height: 0;
+}
+
+/* ── Standard Inputs ────────────────────────────────────────────────────────── */
+input,
+select,
+textarea {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--bg-primary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    transition: var(--transition);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 0.1875rem var(--accent-primary-alpha-10);
+}
+
+:where(input, select, textarea):disabled:not(.panel-disabled *) {
+    background-color: var(--bg-tertiary);
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+/* Destination-root path field: clicking it toggles whether the root's subfolders
+   appear in Managed Folders. Excluded roots mimic the disabled look but stay
+   clickable, so the pointer cursor replaces `not-allowed`. */
+.dest-root-path {
+    cursor: pointer;
+}
+
+.dest-root-path.excluded {
+    background-color: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+/* This field is a toggle, not an editable input; suppress the focus ring the
+   generic `input:focus` rule would otherwise draw on click. */
+.dest-root-path:focus {
+    border-color: var(--border-color);
+    box-shadow: none;
+}
+
+/* ── Custom Select (strict-select) ──────────────────────────────────────────── */
+select.strict-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.5rem;
+    cursor: pointer;
+}
+
+select:disabled.strict-select {
+    cursor: not-allowed;
+}
+
+/* ── Checkbox ────────────────────────────────────────────────────────────────── */
+.checkbox-group {
+    align-items: center;
+    padding: var(--spacing-xs) 0;
+    gap: var(--spacing-sm);
+}
+
+.form-check {
+    display: flex;
+}
+
+.form-check-label {
+    cursor: pointer;
+    line-height: inherit;
+    user-select: none;
+    margin-bottom: 0;
+    color: var(--text-secondary);
+    align-self: center;
+}
+
+input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    align-self: center;
+    width: 2.2rem;
+    height: 1.4rem;
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-primary);
+    cursor: pointer;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    flex-shrink: 0;
+    margin: 0;
+    margin-right: var(--spacing-sm);
+}
+
+@media (max-width: 946px) {
+    input[type="checkbox"] {
+        width: 2.7rem;
+        height: 1.8rem;
+    }
+}
+
+input[type="checkbox"]:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 0.125rem var(--accent-primary-alpha-20);
+}
+
+input[type="checkbox"]:checked {
+    background-color: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    width: 0.35rem;
+    height: 0.65rem;
+    border: solid var(--black);
+    border-width: 0 0.125rem 0.125rem 0;
+    transform: rotate(45deg);
+    margin-bottom: 0.125rem;
+}
+
+input[type="checkbox"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+input[type="checkbox"]:disabled + .form-check-label {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Tri-state: blue fill when inheriting from global defaults ───────────────── */
+input[type="checkbox"].tri-state-default {
+    background-color: color-mix(
+        in srgb,
+        var(--accent-secondary) 25%,
+        transparent
+    );
+    border-color: var(--accent-secondary);
+}
+
+input[type="checkbox"].tri-state-default::after {
+    content: "";
+    position: absolute;
+    width: 0.5rem;
+    height: 0.125rem;
+    background-color: var(--accent-secondary);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* ── Nested Checkbox Hierarchy ──────────────────────────────────────────────── */
+.nested-checkboxes {
+    display: flex;
+    flex-direction: column;
+    margin-left: var(--spacing-md);
+
+    gap: 0.125rem;
+    border-left: 0.125rem solid var(--border-color);
+    padding-left: var(--spacing-sm);
+}
+
+.nested-checkboxes .form-group {
+    margin: 0;
+}
+
+.nested-checkbox-row {
+    display: flex;
+    align-items: center;
+}
+
+.nested-checkbox-row .form-check {
+    padding: var(--spacing-xs) 0;
+}
+
+.nested-checkboxes .checkbox-group-sub:first-child {
+    margin-top: var(--spacing-sm);
+}
+
+.nested-checkboxes .checkbox-group-sub + .checkbox-group-sub {
+    margin-top: var(--spacing-md);
+}
+
+.checkbox-group-sub input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+}
+
+.checkbox-group-sub input[type="checkbox"]:checked::after {
+    width: 0.25rem;
+    height: 0.5rem;
+}
+
+.checkbox-group-sub .form-check-label {
+    opacity: 0.9;
+}
+
+.checkbox-group-sub input[type="checkbox"]:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.checkbox-group-sub input[type="checkbox"]:disabled + .form-check-label {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Forced-active state for child checkboxes forced by parent ─────────────── */
+input[type="checkbox"]:checked.forced-active {
+    background-color: var(--accent-primary-hover);
+    border-color: var(--accent-primary-hover);
+    box-shadow: 0 0 0 0.125rem var(--accent-primary-alpha-35);
+}
+
+input[type="checkbox"]:checked.forced-active::after {
+    border-color: var(--black);
+}
+
+input[type="checkbox"]:disabled.forced-active:checked {
+    opacity: 0.85;
+    cursor: default;
+}
+
+input[type="checkbox"]:disabled.forced-active:checked + .form-check-label {
+    opacity: 0.85;
+    cursor: default;
+}
+
+/* ── Toggle Switch ───────────────────────────────────────────────────────────── */
+.toggle {
+    position: relative;
+    display: inline-block;
+    width: 2.5rem;
+    height: 1.25rem;
+}
+
+.toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* ── Validation States ──────────────────────────────────────────────────────── */
+
+.form-error {
+    color: var(--accent-danger);
+    font-size: var(--font-size-xs);
+    margin-top: var(--spacing-xs);
+    font-weight: 500;
+}
+
+.input-error {
+    border-color: var(--accent-danger) !important;
+}
+
+.input-error:focus {
+    border-color: var(--accent-danger) !important;
+    box-shadow: 0 0 0 0.1875rem var(--accent-danger-alpha-20) !important;
+}
+
+/* ── Term input (profile editor — takes 2x space) ──────────────────────────── */
+.term-input {
+    flex: 2;
+}
+
+/* ── Narrow inputs (episode details modal) ──────────────────────────────────── */
+.input-narrow {
+    min-width: 5rem;
+    width: 8rem;
+}
+
+.input-assign-season,
+.input-assign-episode {
+    width: 3.125rem;
+}
+
+.input-season-num,
+.input-episode-num {
+    width: 10rem;
+}
+
+@media (max-width: 946px) {
+    .input-season-num,
+    .input-episode-num {
+        width: 100%;
+    }
+}
+
+/* ── Misc Form Utilities ────────────────────────────────────────────────────── */
+.search-note {
+    font-style: italic;
+}
+
+.list-style-none {
+    list-style-type: none;
+}
+
+/* ── Nested JSON Schema Form Fields ──────────────────────────────────────────── */
+.nested-fields {
+    padding-left: var(--spacing-md);
+    border-left: 0.15rem solid var(--border-color, #444);
+}
+
+.nested-fields .json-schema-form .form-group .form-group {
+    margin: 0;
+}
+
+/* ==========================================================================
+   9. Episodes Grid & Season Accordion
+   ==========================================================================
+   The episode grid shows individual episode cells in a visual grid layout
+   within each season accordion. Colours indicate status: downloaded (green),
+   missing (red), unreleased (blue), out-of-range (grey strikethrough).
+   Multi-episode ranges get a coloured indicator badge.
+   ========================================================================== */
+
+.season-accordion {
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-md);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+}
+
+.season-header {
+    background-color: var(--bg-tertiary);
+    padding: var(--spacing-md) var(--spacing-lg);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    transition: background-color 0.2s ease;
+}
+
+.season-content {
+    display: none;
+    padding: var(--spacing-md);
+    background-color: var(--bg-primary);
+}
+
+.season-content.active {
+    display: block;
+    animation: slideDown 0.2s ease;
+    /* Let the browser skip layout/paint for expanded seasons scrolled off-screen
+       (large series). `auto` intrinsic size remembers the last rendered height to
+       avoid scroll jumps on re-entry. */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 12rem;
+}
+
+/* ── Episode Grid ────────────────────────────────────────────────────────────── */
+.episodes-grid {
+    display: flex;
+    flex-direction: row-reverse;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    /* Unselectable */
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and Edge */
+    user-select: none; /* Modern standard browsers */
+}
+
+.episodes-grid .episode-cell {
+    flex: 0 0 3rem;
+    width: 3rem;
+}
+
+@media (max-width: 946px) {
+    .episodes-grid {
+        justify-content: center;
+        gap: var(--spacing-sm) var(--spacing-xs);
+    }
+    .episodes-grid .episode-cell {
+        flex: 0 0 5rem;
+        width: 5rem;
+    }
+}
+
+.episode-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    /* Restrict the transitioned properties to those that change on hover/status.
+       `all` also animates width/height, which flip at the 946px breakpoint — with
+       thousands of cells that forces a style+layout pass per animation frame while
+       resizing, which is the visible lag on large seasons. */
+    transition-property:
+        background-color, border-color, color, box-shadow, transform, opacity;
+    position: relative;
+    overflow: hidden;
+}
+
+.multiepisode-indicator {
+    position: absolute;
+    top: 0.125rem;
+    left: 0.125rem;
+    font-size: var(--font-size-xs);
+    line-height: 1;
+    opacity: 0.9;
+    pointer-events: none;
+    /* Don't interfere with cell hover/click */
+}
+
+/* ── Warning indicator for episodes whose file is missing from disk ────────────
+   Positioned opposite the multiepisode indicator (top-right) so both can coexist.
+   Uses the danger palette to signal the file is unreachable. */
+.file-not-found-indicator {
+    position: absolute;
+    top: 0.125rem;
+    right: 0.125rem;
+    font-size: var(--font-size-xs);
+    line-height: 1;
+    color: var(--accent-danger, var(--accent-warning));
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+.file-not-found-indicator svg {
+    width: 0.85rem;
+    height: 0.85rem;
+}
+
+/* ── File-missing warning icon in library table/grid ───────────────────────── */
+.file-not-found-warning {
+    display: inline-flex;
+    align-items: center;
+    margin-right: var(--spacing-xs);
+    vertical-align: middle;
+    color: var(--accent-danger);
+}
+
+.file-not-found-warning svg {
+    width: 1em;
+    height: 1em;
+}
+
+/* ── Episode Status Variants ────────────────────────────────────────────────── */
+.episode-cell.downloaded {
+    background-color: var(--accent-primary-alpha-15);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+/* ── Ghost downloaded cells (shown only because file exists beyond cell_count) ─ */
+.episode-cell.show-only-downloaded {
+    background-color: transparent;
+    border-color: var(--accent-primary);
+    border-style: dashed;
+    color: var(--accent-primary);
+    opacity: 0.5;
+    box-shadow: none;
+}
+
+.episode-cell.missing {
+    background-color: var(--accent-danger-alpha-15);
+    border-color: var(--accent-danger);
+    color: var(--accent-danger);
+}
+
+.episode-cell.in-queue {
+    background-color: var(--accent-warning-alpha-15);
+    border-color: var(--accent-warning);
+    color: var(--accent-warning);
+}
+
+.episode-cell.out-of-range {
+    background-color: var(--bg-primary);
+    border-color: var(--border-color);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Diagonal strikethrough for out-of-range cells */
+.episode-cell.out-of-range::before,
+.episode-cell.out-of-range::after {
+    content: "";
+    position: absolute;
+    width: 60%;
+    height: 0.125rem;
+    background-color: var(--text-muted);
+    opacity: 0.3;
+}
+
+.episode-cell.out-of-range::before {
+    transform: rotate(45deg);
+}
+
+.episode-cell.out-of-range::after {
+    transform: rotate(-45deg);
+}
+
+.episode-cell.unreleased {
+    background-color: var(--accent-info-alpha-10);
+    border-color: var(--accent-info);
+    color: var(--accent-info);
+}
+
+.episode-cell.monitored:not(.out-of-range)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        135deg,
+        transparent,
+        transparent 0.25rem,
+        var(--monitored-stripe) 0.25rem,
+        var(--monitored-stripe) 0.4375rem
+    );
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+/* ── Episodes Header (above season grid) ────────────────────────────────────── */
+.episodes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+@media (max-width: 946px) {
+    .episodes-header {
+        flex-direction: column;
+    }
+
+    .episodes-header .legend-container {
+        justify-content: flex-start;
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: var(--spacing-xs);
+    }
+}
+
+/* ── Episode Legend ──────────────────────────────────────────────────────────── */
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    white-space: nowrap;
+}
+
+.legend-dot {
+    width: 1.3rem;
+    height: 0.75rem;
+    border-radius: 0.125rem;
+    display: inline-block;
+}
+
+.legend-dot--downloaded {
+    background-color: var(--accent-primary);
+}
+
+.legend-dot--missing {
+    background-color: var(--accent-danger);
+}
+
+.legend-dot--in-queue {
+    background-color: var(--accent-warning);
+}
+
+.legend-dot--unreleased {
+    background-color: var(--accent-info);
+}
+
+.legend-dot--oor {
+    background-color: var(--border-color);
+    position: relative;
+    overflow: hidden;
+}
+
+.legend-dot--monitored {
+    background-color: var(--bg-secondary);
+    background-image: repeating-linear-gradient(
+        135deg,
+        transparent,
+        transparent 0.25rem,
+        var(--monitored-stripe) 0.25rem,
+        var(--monitored-stripe) 0.4375rem
+    );
+}
+
+.legend-dot--show-only-downloaded {
+    background-color: transparent;
+    border: 0.125rem dashed var(--accent-primary);
+    opacity: 0.6;
+}
+
+.legend-label {
+    line-height: 0.75rem;
+    display: inline-block;
+}
+
+/* Diagonal slash inside the out-of-range legend dot */
+.legend-dot-slash {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 80%;
+    height: 0.125rem;
+    background-color: var(--text-muted);
+    transform: translate(-50%, -50%) rotate(45deg);
+}
+
+/* ── "Add Season" Bar ───────────────────────────────────────────────────────── */
+.add-season-bar {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border: 0.0625rem solid var(--border-color);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm);
+    align-items: center;
+}
+
+.add-season-bar .form-group {
+    margin: 0;
+    display: contents;
+}
+
+.add-season-bar .form-label {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.add-season-bar > :nth-child(3) {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    height: 100%;
+    display: inline-block;
+}
+
+@media (max-width: 930px) {
+    .add-season-bar {
+        padding: var(--spacing-md) !important;
+        gap: var(--spacing-md) !important;
+        display: grid;
+    }
+}
+
+@media (max-width: 946px) {
+    .add-season-bar {
+        padding: var(--spacing-md) !important;
+        gap: var(--spacing-md) !important;
+        display: grid;
+    }
+}
+
+@media (max-width: 430px) {
+    .add-season-bar {
+        display: flex;
+    }
+
+}
+
+/* ==========================================================================
+   10. Calendar
+    ==========================================================================
+    Month grid view with day cells containing event pills, plus a list view.
+    Supports dark/light theme and highlights today's date.
+    ========================================================================== */
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+@media (max-width: 946px) {
+    .calendar-header {
+        flex-direction: column-reverse;
+        align-items: flex-start;
+        gap: var(--spacing-md);
+        margin-bottom: 0.75rem;
+    }
+}
+
+.calendar-nav {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.0625rem;
+    background-color: var(--border-color);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.calendar-day-header {
+    background-color: var(--bg-secondary);
+    padding: var(--spacing-md);
+    text-align: center;
+    font-weight: 600;
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.calendar-day {
+    background-color: var(--bg-primary);
+    padding: var(--spacing-sm);
+    position: relative;
+    height: 7.12rem;
+    transition: background-color 0.2s ease;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.calendar-day.other-month {
+    background-color: var(--bg-calendar-other);
+    color: var(--text-muted);
+}
+
+.calendar-day.today {
+    background-color: var(--accent-primary-alpha-10);
+}
+
+.day-number {
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+}
+
+.today .day-number {
+    color: var(--accent-primary);
+    background-color: var(--accent-primary);
+    color: var(--black);
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+/* ── Calendar Events (pills inside day cells) ──────────────────────────────── */
+.calendar-event {
+    display: flex;
+    gap: var(--spacing-xs);
+    align-items: baseline;
+    font-size: var(--font-size-xs);
+    padding: 0.125rem var(--spacing-sm);
+    margin-bottom: 0.125rem;
+    border-radius: var(--radius-sm);
+    background-color: var(--accent-secondary);
+    color: var(--white);
+    overflow: hidden;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    min-width: 0;
+}
+
+.calendar-event-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 1ch;
+    flex-shrink: 1;
+}
+
+.calendar-event-episode {
+    flex-shrink: 0;
+    white-space: nowrap;
+    margin-left: auto;
+}
+
+.calendar-events-container {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.calendar-event-more {
+    font-size: var(--font-size-xs);
+    padding: 0.125rem var(--spacing-xs);
+    margin-top: 0.125rem;
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-tertiary);
+    color: var(--text-muted);
+    text-align: center;
+    cursor: pointer;
+    font-weight: 500;
+    transition: var(--transition);
+}
+
+.calendar-event.downloaded {
+    background-color: var(--accent-primary);
+    color: var(--black);
+}
+
+.calendar-event.missing {
+    background-color: var(--accent-danger);
+    color: var(--white);
+}
+
+.calendar-event.upcoming {
+    background-color: var(--accent-info);
+    color: var(--white);
+}
+
+.calendar-event.out-of-range {
+    background-color: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+/* ── Calendar Week View ──────────────────────────────────────────────────────── */
+.calendar-week {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.calendar-week-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-md);
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+}
+
+.calendar-week-label {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.calendar-week-day-separator {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-xs) 0 0 0;
+    border-top: 0.0625rem solid var(--border-color);
+    cursor: pointer;
+    user-select: none;
+}
+
+.calendar-week-day-separator.collapsed {
+    padding-bottom: var(--spacing-xs);
+}
+
+.calendar-week-day-label {
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.accordion-arrow {
+    margin-left: auto;
+    font-size: 0.625rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+}
+
+.accordion-arrow svg {
+    transition: transform 0.2s ease;
+}
+
+.calendar-week-day-separator.collapsed .accordion-arrow svg {
+    transform: rotate(-90deg);
+}
+
+.calendar-week-day-content.collapsed {
+    display: none;
+}
+
+.calendar-item {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    align-items: center;
+    margin-bottom: var(--spacing-xs);
+    text-align: left;
+    height: 6.1rem;
+}
+
+.calendar-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 3rem;
+    padding: var(--spacing-sm);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+}
+
+.calendar-date-day {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--accent-primary);
+}
+
+.calendar-date-day.date-downloaded {
+    color: var(--accent-primary);
+}
+
+.calendar-date-day.date-missing {
+    color: var(--accent-danger);
+}
+
+.calendar-date-day.date-upcoming {
+    color: var(--accent-info);
+}
+
+.calendar-date-month {
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.calendar-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.calendar-info-title {
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendar-info-meta {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+}
+
+/* View toggle (grid / list) */
+.view-toggle {
+    display: flex;
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-xs);
+}
+
+.view-toggle-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 0.375rem;
+    font-size: var(--font-size-sm);
+    transition: var(--transition);
+    width: 4.326rem;
+}
+
+.view-toggle-btn.active {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   11. Modal / Bottom Sheet
+    ==========================================================================
+    Full-screen overlay modal with centered container. On mobile (< 946px),
+    the modal becomes a bottom sheet with an iOS-style drag handle, slide-up
+    animation, and safe-area-aware padding.
+    ========================================================================== */
+
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background-color: var(--black-alpha-80);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xl);
+    backdrop-filter: blur(0.25rem);
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-container {
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    width: 100%;
+    min-width: var(--min-screen-width);
+    max-width: 80%;
+    height: auto;
+    max-height: calc(100dvh - 4rem);
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    box-shadow: 0 1.25rem 1.5625rem -0.3125rem var(--black-alpha-50);
+    animation: scaleIn 0.2s ease;
+}
+
+/* ── Modal Sizes ────────────────────────────────────────────────────────────── */
+.modal-xs {
+    max-width: 18rem;
+}
+
+.modal-sm {
+    max-width: 25rem;
+}
+
+.modal-md {
+    max-width: 31.25rem;
+}
+
+.modal-lg {
+    max-width: 37.5rem;
+}
+
+.modal-xl {
+    max-width: 50rem;
+    width: 100%;
+}
+
+.modal-xxl {
+    max-width: 56.25rem;
+    width: 95%;
+}
+
+.modal-full {
+    max-width: 90vw;
+    height: 80vh;
+}
+
+/* ── Modal Sections ─────────────────────────────────────────────────────────── */
+.modal-header {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-bottom: 0.0625rem solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    background-color: var(--bg-overlay);
+    touch-action: none;
+}
+
+.modal-title-container {
+    min-width: 0;
+    flex: 1;
+    margin-right: var(--spacing-md);
+}
+
+.modal-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.modal-subtitle {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-top: var(--spacing-xs);
+}
+
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-xl);
+    min-height: 0;
+}
+
+.modal-body--flush {
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-body--flush .modal-body {
+    padding: 0 !important;
+}
+
+.modal-footer {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-top: 0.0625rem solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+    flex-shrink: 0;
+    background-color: var(--bg-overlay);
+    flex-wrap: wrap;
+}
+
+.modal-footer-wrapper {
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* Responsive footer delete button: shows its label by default and swaps to the
+   trash icon on narrow screens so compact footers stay readable. Shared by the
+   plugin config footer and the manage-series-files footer. */
+.footer-delete-btn .delete-icon {
+    display: none;
+}
+
+/* ── Mobile Bottom Sheet ─────────────────────────────────────────────────────── */
+@media (max-width: 946px) {
+    .modal-overlay {
+        align-items: flex-end !important;
+        padding: 0 !important;
+        backdrop-filter: blur(0.125rem);
+    }
+
+    .modal-container,
+    .search-modal-container {
+        width: 100% !important;
+        max-width: 100% !important;
+        /* Mobile bottom sheet: height is set inline (px) by ModalWrapper's
+           detent logic (90vh cap; a 65vh low detent only on tall viewports).
+           This ceiling only needs to permit the rubber zone above the 90vh
+           detent — it must not clamp it. */
+        max-height: 100dvh !important;
+        border-radius: 1.25rem 1.25rem 0 0 !important;
+        box-shadow: 0 -0.5rem 1.5rem var(--black-alpha-30) !important;
+        animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-bottom: none !important;
+        margin: 0 !important;
+    }
+
+    /* Drag-dismiss: sheet slides back down (reverse of the open slide-up)
+       while the overlay fades. ModalWrapper's `is_exiting` adds the class; the
+       close is driven by the container's `animationend` (plus a safety-net
+       timeout), so the exit duration is defined once here and inherited. */
+    .modal-overlay.modal-exiting {
+        --modal-exit-duration: 0.3s;
+        animation: modalFadeOut var(--modal-exit-duration) ease forwards;
+    }
+
+    .modal-container.modal-exiting {
+        /* Inherits --modal-exit-duration from the overlay. */
+        animation: sheetSlideOut var(--modal-exit-duration)
+            cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    /* Size overrides for mobile */
+    .modal-sm,
+    .modal-md,
+    .modal-lg,
+    .modal-xl,
+    .modal-xxl,
+    .modal-full {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: var(--min-screen-width);
+    }
+
+    .modal-header {
+        position: relative;
+        padding: 1.5rem var(--spacing-lg) var(--spacing-md) !important;
+        border-top-left-radius: 1.25rem !important;
+        border-top-right-radius: 1.25rem !important;
+        cursor: grab;
+        user-select: none;
+    }
+
+    .modal-header:active {
+        cursor: grabbing;
+    }
+
+    /* iOS-style drag handle */
+    .modal-header::before {
+        content: "";
+        position: absolute;
+        top: 0.625rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 2.5rem;
+        height: 0.25rem;
+        background-color: var(--border-color);
+        border-radius: 1rem;
+        z-index: 1001;
+        transition: background-color 0.2s;
+    }
+
+    .is-dragging .modal-header::before {
+        background-color: var(--text-muted);
+    }
+
+    .modal-body {
+        padding: var(--spacing-lg) !important;
+        padding-bottom: 4rem !important;
+        /* Large buffer for on-screen keyboard */
+    }
+
+    .modal-footer {
+        padding: var(--spacing-md) var(--spacing-lg)
+            var(--mobile-footer-padding-bottom) !important;
+        background-color: var(--bg-secondary) !important;
+    }
+
+    /* Plugin config footer: keep both divs on one row on mobile */
+    .plugin-config-footer {
+        flex-wrap: nowrap;
+    }
+
+    .plugin-config-footer .footer-right {
+        gap: var(--spacing-xs);
+    }
+
+    @media (max-width: 946px) {
+        .plugin-config-footer .footer-right {
+            gap: inherit;
+        }
+    }
+
+    @media (max-width: 500px) {
+        .footer-delete-btn .delete-label {
+            display: none;
+        }
+
+        .footer-delete-btn .delete-icon {
+            display: inline-flex;
+        }
+    }
+
+    @media (max-width: 380px) {
+        .plugin-config-footer {
+            flex-direction: column;
+        }
+        .plugin-config-footer .delete-icon {
+            display: none;
+        }
+        .plugin-config-footer .delete-label {
+            display: contents;
+        }
+    }
+
+    .modal-footer-wrapper {
+        border-radius: 0 !important;
+    }
+}
+
+/* Calendar modal scroll area */
+.calendar-modal-scroll {
+    overflow-y: auto;
+    max-height: 25rem;
+}
+
+/* Search modal container (wider than standard modals) */
+.search-modal-container {
+    max-width: 95rem;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+}
+
+/* ==========================================================================
+   12. Info Sections, Badges, Status Badges, Media Info
+    ==========================================================================
+    Info sections display episode details (label + value pairs). Badges are
+    small coloured labels used for status indication. Status badges are
+    pill-shaped and used in episode detail views. Media info grids show
+    codec, resolution, audio/subtitle tracks, etc.
+    ========================================================================== */
+
+/* ── Info Sections ──────────────────────────────────────────────────────────── */
+.info-section {
+    margin-bottom: var(--spacing-xl);
+}
+
+.info-section:last-child {
+    margin-bottom: 0;
+}
+
+.info-label {
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-sm);
+    font-weight: 600;
+}
+
+.info-value {
+    color: var(--text-primary);
+    word-break: break-word;
+    font-family: var(--font-mono);
+    background-color: var(--bg-primary);
+    padding: 0.75rem;
+    border-radius: var(--border-radius);
+    border: 0.0625rem solid var(--border-color);
+}
+
+.info-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* ── Status Badges (pill-shaped) ────────────────────────────────────────────── */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0.375rem 0.5rem;
+    border-radius: 1rem;
+    font-weight: 600;
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and Edge */
+    user-select: none; /* Modern standard browsers */
+    width: 6.5rem;
+    justify-content: center;
+}
+
+.card-footer .status-badge {
+    padding-left: 0;
+    display: inline;
+}
+
+.status-badge.downloaded {
+    background-color: var(--accent-primary-alpha-20);
+    color: var(--accent-primary);
+}
+
+.status-badge.missing {
+    background-color: var(--accent-danger-alpha-20);
+    color: var(--accent-danger);
+}
+
+.status-badge.unreleased {
+    background-color: var(--accent-info-alpha-10);
+    color: var(--accent-info);
+}
+
+.status-badge.in-queue {
+    background-color: var(--accent-warning-alpha-20);
+    color: var(--accent-warning);
+}
+
+.status-badge.not-found {
+    background-color: var(--accent-danger-alpha-20);
+    color: var(--accent-danger);
+    text-decoration: line-through;
+}
+
+.status-badge.out-of-range {
+    background-color: var(--gray-alpha-20);
+    color: var(--text-muted);
+}
+
+.status-badge.monitored {
+    background-color: var(--accent-primary-alpha-20);
+    color: var(--accent-primary);
+}
+
+.status-badge.unmonitored {
+    background-color: var(--gray-alpha-20);
+    color: var(--text-muted);
+}
+
+/* ── General Badges ──────────────────────────────────────────────────────────── */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 6rem;
+    overflow: clip;
+    padding: 0.15rem 0.4rem;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ── Badge Colour Variants ──────────────────────────────────────────────────── */
+.badge-blue {
+    background-color: var(--accent-secondary-alpha-20);
+    color: var(--accent-secondary-hover);
+}
+
+.badge-green {
+    background-color: var(--accent-primary-alpha-20);
+    color: var(--accent-primary-light);
+}
+
+.badge-purple {
+    background-color: var(--purple-alpha-20);
+    color: var(--purple-hover);
+}
+
+.badge-yellow {
+    background-color: var(--yellow-alpha-20);
+    color: var(--yellow-hover);
+}
+
+.badge-orange {
+    background-color: var(--orange-alpha-20);
+    color: var(--orange-hover);
+}
+
+.badge-pink {
+    background-color: var(--pink-alpha-20);
+    color: var(--pink-hover);
+}
+
+.badge-primary {
+    background-color: var(--accent-secondary-alpha-20);
+    color: var(--accent-secondary-hover);
+}
+
+.badge-success {
+    background-color: var(--accent-primary-alpha-20);
+    color: var(--accent-primary-light);
+}
+
+.badge-danger {
+    background-color: var(--accent-danger-alpha-20);
+    color: var(--accent-danger-hover);
+}
+
+.badge-warning {
+    background-color: var(--accent-warning-alpha-12);
+    color: var(--accent-warning);
+}
+
+.badge-info {
+    background-color: var(--accent-info-alpha-10);
+    color: var(--accent-info);
+}
+
+.badge-teal {
+    background-color: var(--accent-info-alpha-20);
+    color: var(--accent-info-hover);
+}
+
+.badge-secondary {
+    background-color: var(--gray-alpha-20);
+    color: var(--text-secondary);
+}
+
+.badge-rename {
+    background-color: var(--accent-info-alpha-20);
+    color: var(--accent-info);
+    border: 0.0625rem solid var(--accent-info-alpha-20);
+}
+
+.badge-overwrite {
+    background-color: var(--accent-danger-alpha-20);
+    color: var(--accent-danger);
+    border: 0.0625rem solid var(--accent-danger-alpha-20);
+}
+
+.badge-skip {
+    background-color: var(--accent-warning-alpha-20);
+    color: var(--accent-warning);
+    border: 0.0625rem solid var(--accent-warning-alpha-20);
+}
+
+/* ── Media Info Grid ────────────────────────────────────────────────────────── */
+.media-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-md);
+}
+
+.media-info-item {
+    background-color: var(--bg-primary);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius);
+    border: 0.0625rem solid var(--border-color);
+    transition: border-color 0.2s ease;
+}
+
+.media-info-label {
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-xs);
+}
+
+.media-info-value {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Compact media info grid (for episode part details) */
+.media-info-grid--compact {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+.media-info-grid--compact .media-info-item {
+    padding: var(--spacing-sm);
+}
+
+/* ── Episode Parts List ─────────────────────────────────────────────────────── */
+.episode-parts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.episode-part-card {
+    background-color: var(--bg-primary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    transition: border-color 0.2s ease;
+}
+
+.episode-part-card[open] {
+    border-color: var(--accent-secondary);
+}
+
+.episode-part-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md);
+    list-style: none;
+}
+
+.episode-part-header::-webkit-details-marker {
+    display: none;
+}
+
+.episode-part-content {
+    border-top: 0.0625rem solid var(--border-color);
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    background-color: var(--bg-secondary);
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+}
+
+/* ── Activity Details ───────────────────────────────────────────────────────── */
+.activity-details {
+    max-width: 20vw;
+}
+
+@media (max-width: 946px) {
+    .activity-details {
+        max-width: 100%;
+    }
+}
+
+.activity-title {
+    font-weight: var(--font-weight-bold);
+    max-width: 20vw;
+}
+
+/* Action row at the top of the "Filter Activity Types" modal. */
+.activity-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+}
+
+@media (max-width: 946px) {
+    .activity-filter-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-self: center;
+    }
+}
+
+/* ==========================================================================
+   13. Edit Series View
+    ==========================================================================
+    Tabbed interface for editing series settings, episodes, metadata, and
+    action-row actions. Uses .edit-tabs + .edit-content panels, with a
+    season-config sub-system for per-season overrides.
+    ========================================================================== */
+
+.edit-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 0.0625rem solid var(--border-color);
+}
+
+#edit-header-message {
+    display: grid;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-left: auto;
+}
+
+.back-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius);
+    transition: var(--transition);
+    min-height: 2.75rem;
+    /* 44px touch target */
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Media scan progress pill ──────────────────────────────────────────────── */
+.progress-text {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0.3125rem 0.75rem;
+    border-radius: 1rem;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--accent-info);
+    background-color: var(--accent-info-alpha-10);
+    border: 0.0625rem solid var(--accent-info-alpha-20);
+    animation: progressPulse 2s ease-in-out infinite;
+    white-space: nowrap;
+}
+
+.progress-text::before {
+    content: "";
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background-color: var(--accent-info);
+    animation: progressPulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+}
+
+/* ── Missing-files banner in edit-header — same shape as progress-text but danger ─ */
+.not-found-text {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0.3125rem 0.75rem;
+    border-radius: 1rem;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--accent-danger);
+    background-color: var(--accent-danger-alpha-15);
+    border: 0.0625rem solid var(--accent-danger);
+    white-space: nowrap;
+}
+
+.not-found-text::before {
+    content: "\26A0";
+    line-height: 1;
+}
+
+@keyframes progressPulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ── Edit Tabs ────────────────────────────────────────────────────────────────── */
+.edit-tabs {
+    display: flex;
+    gap: var(--spacing-sm);
+    border-bottom: 0.0625rem solid var(--border-color);
+    background-color: var(--bg-secondary);
+    padding: 0 var(--spacing-lg);
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+@media (max-width: 946px) {
+    .edit-tabs {
+        padding: 0;
+        gap: 0;
+    }
+}
+
+.edit-tab {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 0.125rem solid transparent;
+    margin-bottom: -0.0625rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-weight: 500;
+    transition: var(--transition);
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+}
+
+.edit-tab.active {
+    color: var(--accent-primary);
+    border-bottom-color: var(--accent-primary);
+}
+
+.edit-tab,
+.edit-tab:focus,
+.edit-tab:visited {
+    text-decoration: none;
+}
+
+@media (max-width: 370px) {
+    .edit-tab {
+        padding: var(--spacing-md) 0;
+    }
+}
+
+.edit-content {
+    display: none;
+    padding: var(--spacing-xl);
+    background-color: var(--bg-secondary);
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    border: 0.0625rem solid var(--border-color);
+    border-top: none;
+    margin-bottom: var(--spacing-xl);
+}
+
+@media (max-width: 946px) {
+    .edit-content {
+        padding: var(--spacing-md);
+    }
+}
+
+.edit-content.active {
+    display: block;
+}
+
+.edit-content .form-row {
+    margin-bottom: var(--spacing-lg);
+}
+
+/* The Add Series form reuses .edit-content, but with no .edit-tabs bar above it,
+   so the shared flat-top radius + missing top border read as "cut off". Give it
+   a full standalone card shape instead. */
+#add-series-content {
+    border-radius: var(--border-radius);
+    border-top: 0.0625rem solid var(--border-color);
+}
+
+/* ── Danger Zone ──────────────────────────────────────────────────────────────── */
+.danger-zone {
+    margin-top: var(--spacing-xl);
+    padding: var(--spacing-lg);
+    border: 0.0625rem solid var(--accent-danger-alpha-25);
+    border-radius: var(--border-radius);
+    background-color: var(--accent-danger-alpha-10);
+}
+
+.danger-zone-title {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent-danger);
+    margin-bottom: var(--spacing-md);
+}
+
+.action-row-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-md);
+}
+
+.action-row-desc {
+    color: var(--text-secondary);
+    flex: 1;
+    min-width: 12rem;
+}
+
+.danger-zone .btn {
+    width: 10rem;
+}
+
+.path-preview {
+    font-family: var(--font-mono);
+    background-color: var(--bg-tertiary);
+    padding: 0.125rem var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    word-break: break-all;
+}
+
+#add-series-validation-placeholder .form-error {
+    margin: 0;
+    margin-bottom: 1.25rem;
+}
+
+#edit-series-action-row-placeholder {
+    max-width: 30rem;
+    opacity: 0.5;
+}
+
+/* ── Season-Specific Settings ─────────────────────────────────────────────────── */
+
+.season-config-panel {
+    display: none;
+}
+
+.season-config-panel.active {
+    display: block;
+    animation: fadeIn 0.2s ease;
+}
+
+/* ── Inheritance Toggle ───────────────────────────────────────────────────────── */
+.inheritance-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--accent-info-alpha-10);
+    border: 0.0625rem solid var(--accent-info);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-xs);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.inheritance-toggle label {
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
+.inheritance-hint {
+    font-size: var(--font-size-xs);
+    color: var(--accent-info);
+    margin-left: auto;
+}
+
+.panel-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(0.5);
+}
+
+.ranking-list-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+}
+@media (max-width: 350px) {
+    .ranking-list-header {
+        flex-direction: column;
+    }
+}
+
+.season-header-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex: 1;
+}
+
+.season-header-title {
+    flex: 1;
+}
+
+/* ── Season Override Section ─────────────────────────────────────────────────── */
+.season-override-section {
+    background-color: var(--bg-overlay);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    transition: border-color 0.2s ease;
+}
+
+.season-override-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 0.0625rem solid var(--border-color);
+}
+
+/* ==========================================================================
+   14. Login Page
+    ==========================================================================
+    Minimal centered card layout for the login form. Uses the same design
+    tokens as the rest of the app but isolates its styles to prevent
+    accidental leakage into other pages.
+    ========================================================================== */
+
+.login-page {
+    flex: 1;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.login-glass-card {
+    width: 100%;
+    max-width: 25rem;
+    padding: var(--spacing-xl);
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow:
+        0 0.25rem 0.375rem -0.0625rem var(--black-alpha-10),
+        0 0.125rem 0.25rem -0.0625rem var(--black-alpha-6);
+}
+
+@media (max-width: 450px) {
+    .login-glass-card {
+        height: 100vh;
+        max-width: 100vw;
+    }
+}
+
+.login-title {
+    font-size: var(--font-size-2xl);
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-primary);
+}
+
+.login-subtitle {
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-xl);
+}
+
+.login-glass-card .form-group input {
+    background-color: var(--bg-primary);
+    border: 0.0625rem solid var(--border-color);
+    transition: var(--transition);
+}
+
+.login-glass-card .form-group input:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 0.1875rem var(--accent-primary-alpha-10);
+}
+
+.login-glass-card .form-label {
+    font-weight: 500;
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-secondary);
+}
+
+.login-btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    background-color: var(--accent-primary);
+    color: var(--black);
+    border: 0.0625rem solid transparent;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-top: var(--spacing-md);
+    box-shadow: 0 0.25rem 0.75rem var(--accent-primary-alpha-25);
+    font-family: inherit;
+}
+
+.login-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.login-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background-color: var(--bg-tertiary);
+    color: var(--text-muted);
+    box-shadow: none;
+    transform: none;
+}
+
+/* ==========================================================================
+   15. Tooltips
+    ==========================================================================
+    Hover tooltips anchored to any element carrying `.tooltip-host` (help icons
+    add `.help-icon` for their question-mark-circle styling). The content is
+    `position: fixed`; the hover script places it above or below the host,
+    clamped to the enclosing modal (if any) and the window. Hosts built with
+    `with_auto_down` (`.tooltip-auto-down`) prefer opening downward.
+    ========================================================================== */
+
+/* The mechanism class: the hover script binds to `.tooltip-host` and positions
+   the fixed `.tooltip-content` against it. Normal tooltips add their own class
+   for styling; help icons pair it with `.help-icon`. */
+.tooltip-host {
+    cursor: help;
+}
+
+.help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--font-size-lg);
+    height: var(--font-size-lg);
+    flex-shrink: 0;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    background-color: var(--bg-tertiary);
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    cursor: help;
+    margin-left: var(--spacing-sm);
+    position: relative;
+    border: 0.0625rem solid var(--border-color);
+    transition: var(--transition);
+    line-height: 1;
+}
+
+@media (max-width: 946px) {
+    .help-icon {
+        width: 3.125rem;
+        height: 1.3rem;
+        border-radius: 0.125rem;
+        aspect-ratio: auto;
+    }
+}
+
+.tooltip-content {
+    visibility: hidden;
+    opacity: 0;
+    /* Fixed so the tooltip escapes every intermediate clipping ancestor (cards,
+       table scroll wrappers, `overflow: clip` badges, …). The hover script sets
+       `left`/`top`, clamped to the enclosing modal (if any) and the window. */
+    position: fixed;
+    width: auto;
+    min-width: 18rem;
+    max-width: min(calc(100vw - 2rem), 28rem);
+    padding: var(--spacing-md);
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow:
+        0 0.625rem 0.9375rem -0.1875rem var(--black-alpha-10),
+        0 0.25rem 0.375rem -0.125rem var(--black-alpha-5);
+    z-index: 2000;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    overflow-wrap: break-word;
+    overflow-y: auto;
+    max-height: 70vh;
+    font-weight: 400;
+    line-height: 1.4;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+    text-align: left;
+}
+
+.tooltip-host.tooltip-visible .tooltip-content {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.tooltip-title {
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+    color: var(--accent-info);
+    border-bottom: 0.0625rem solid var(--border-color);
+    padding-bottom: var(--spacing-xs);
+}
+
+.tooltip-subtitle {
+    font-weight: 600;
+    margin-top: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+}
+
+.tooltip-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--spacing-xs) var(--spacing-md);
+}
+
+.tooltip-list li {
+    display: contents;
+}
+
+.tooltip-list li > .tooltip-var {
+    grid-column: 1;
+}
+
+.tooltip-list li > .tooltip-desc {
+    grid-column: 2;
+}
+
+.tooltip-var {
+    font-family: var(--font-mono);
+    color: var(--accent-secondary);
+    white-space: nowrap;
+}
+
+.tooltip-desc {
+    line-height: 1.4;
+    color: var(--text-muted);
+}
+
+.tooltip-example {
+    line-height: 1.4;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   16. Toast Notifications
+    ==========================================================================
+    Fixed-position container in the bottom-right corner with slide-in
+    animation. Supports four variants (success, warning, error, info) with
+    coloured left borders and animated progress bars that count down the
+    auto-dismiss duration.
+    ========================================================================== */
+
+.toast-container {
+    position: fixed;
+    bottom: var(--spacing-xl);
+    right: var(--spacing-xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    z-index: 1001;
+    pointer-events: none;
+    max-width: calc(100vw - 2 * var(--spacing-xl));
+}
+
+@media (max-width: 946px) {
+    .toast-container {
+        top: calc(var(--spacing-md) + env(safe-area-inset-top, 0rem));
+        bottom: auto;
+        right: var(--spacing-md);
+        max-width: none;
+    }
+
+    .toast {
+        min-width: unset;
+        max-width: none;
+        width: 100%;
+        animation: slideInTop 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+}
+
+/* Desktop: raise toast notifications when the bulk-action footer is visible (edit mode)
+   so they don't overlap the fixed footer at the bottom of the page. */
+@media (min-width: 946px) {
+    body:has(.mb-footer) .toast-container {
+        bottom: 7rem;
+    }
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    min-width: 20rem;
+    max-width: 24rem;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background-color: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow:
+        0 0.625rem 0.9375rem -0.1875rem var(--black-alpha-50),
+        0 0.25rem 0.375rem -0.125rem var(--black-alpha-30);
+    animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.toast-icon {
+    font-size: var(--font-size-xl);
+    line-height: 1;
+    flex-shrink: 0;
+    font-weight: 600;
+}
+
+.toast-message {
+    flex: 1;
+    color: var(--text-primary);
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: var(--font-size-2xl);
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--border-radius);
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+/* ── Progress Bar (auto-dismiss countdown) ──────────────────────────────────── */
+.toast-progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0.1875rem;
+    background-color: var(--black-alpha-10);
+}
+
+.toast-progress {
+    height: 100%;
+    width: 100%;
+    transform-origin: left;
+}
+
+.toast-progress.running {
+    animation: progress-decrease linear forwards;
+}
+
+/* ── Variant-specific Styles ──────────────────────────────────────────────────── */
+.toast-success {
+    border-left: 0.1875rem solid var(--accent-primary);
+}
+
+.toast-success .toast-icon {
+    color: var(--accent-primary);
+}
+
+.toast-success .toast-progress {
+    background-color: var(--accent-primary);
+}
+
+.toast-warning {
+    border-left: 0.1875rem solid var(--accent-warning);
+}
+
+.toast-warning .toast-icon {
+    color: var(--accent-warning);
+}
+
+.toast-warning .toast-progress {
+    background-color: var(--accent-warning);
+}
+
+.toast-error {
+    border-left: 0.1875rem solid var(--accent-danger);
+}
+
+.toast-error .toast-icon {
+    color: var(--accent-danger);
+}
+
+.toast-error .toast-progress {
+    background-color: var(--accent-danger);
+}
+
+/* ── Sticky Toast (progress, never auto-dismisses) ────────────────────────── */
+.toast-sticky {
+    border-left: 0.1875rem solid var(--accent-info);
+}
+
+.toast-sticky .toast-icon {
+    color: var(--accent-info);
+}
+
+/* Determinate progress bar (shown as a fill percentage) */
+.toast-progress-determinate {
+    background-color: var(--accent-info);
+    transform-origin: left;
+    transition: width 0.3s ease;
+}
+
+/* Indeterminate progress (shown as a pulsing animation) */
+.toast-progress-indeterminate {
+    width: 30% !important;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--accent-info-alpha-50),
+        transparent
+    );
+    animation: toast-indeterminate 1.5s ease-in-out infinite;
+}
+
+/* ── Expanded Container ─────────────────────────────────────────────────────── */
+.toast-container-expanded {
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+/* ── Controls (expand / collapse / dismiss all) ─────────────────────────────── */
+.toast-controls {
+    display: flex;
+    gap: var(--spacing-sm);
+    pointer-events: auto;
+    justify-content: flex-end;
+}
+
+.toast-control-btn {
+    background: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    pointer-events: auto;
+    line-height: 1.4;
+}
+
+.toast-control-btn-danger {
+    color: var(--accent-danger);
+}
+
+.toast-info {
+    border-left: 0.1875rem solid var(--accent-info);
+}
+
+.toast-info .toast-icon {
+    color: var(--accent-info);
+}
+
+.toast-info .toast-progress {
+    background-color: var(--accent-info);
+}
+
+/* ==========================================================================
+   17. Skeleton / Shimmer Loading
+    ==========================================================================
+    Skeleton placeholders used during async data loading. A shimmer animation
+    sweeps across the placeholder to indicate ongoing activity.
+    ========================================================================== */
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-tertiary) 25%,
+        var(--bg-hover) 37%,
+        var(--bg-tertiary) 63%
+    );
+    background-size: 80rem 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+    border-radius: var(--border-radius);
+}
+
+.skeleton-line {
+    height: 1rem;
+    border-radius: var(--radius-sm);
+}
+
+.skeleton-line-sm {
+    height: 0.75rem;
+    border-radius: var(--radius-sm);
+}
+
+.skeleton-line-lg {
+    height: 1.5rem;
+    border-radius: var(--radius-sm);
+}
+
+.skeleton-block {
+    height: 2.5rem;
+    border-radius: var(--border-radius);
+}
+
+.skeleton-card {
+    padding: var(--spacing-md);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    background-color: var(--bg-secondary);
+}
+
+/* ── Edit Series Skeleton ────────────────────────────────────────────────────── */
+.skeleton-edit-series {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+    padding: var(--spacing-xl);
+    max-width: 60rem;
+}
+
+.skeleton-form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.skeleton-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+/* ==========================================================================
+   18. Loader & Empty States
+    ==========================================================================
+    Loading spinner, empty-state placeholder, and error container used
+    across the application for async data boundaries.
+    ========================================================================== */
+
+.loader-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 3rem;
+}
+
+/* HTML: <div class="loader"></div> — a 9-dot wave animation */
+.loader {
+    width: 0.25rem;
+    color: var(--text-primary);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    box-shadow:
+        1.1875rem -1.1875rem 0 0rem,
+        2.375rem -1.1875rem 0 0rem,
+        3.5625rem -1.1875rem 0 0rem,
+        1.1875rem 0 0 0.3125rem,
+        2.375rem 0 0 0.3125rem,
+        3.5625rem 0 0 0.3125rem,
+        1.1875rem 1.1875rem 0 0rem,
+        2.375rem 1.1875rem 0 0rem,
+        3.5625rem 1.1875rem 0 0rem;
+    transform: translateX(-2.375rem);
+    animation: l26 2s infinite linear;
+}
+
+/* Inline loading spinner for buttons and inline elements.
+   Uses a simple CSS border-spin animation.
+   Smaller than the full .loader component, intended for use inside
+   table cells, buttons, or alongside text.
+   Width/height match the line-height to avoid layout shifts. */
+.inline-loader {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border: 2px solid var(--text-muted);
+    border-top-color: var(--text-primary);
+    border-radius: 50%;
+    animation: inline-spin 0.6s linear infinite;
+    vertical-align: middle;
+}
+
+@keyframes inline-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.empty-state {
+    padding: 3rem;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+}
+
+/* ── Error Container (e.g., "Series Not Found") ─────────────────────────────── */
+.error-container {
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+}
+
+.error-container-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: var(--spacing-md);
+}
+
+/* ==========================================================================
+   19. Search / Results
+    ==========================================================================
+    Search modal with a query input, results table, and action buttons.
+    ========================================================================== */
+
+.search-bar {
+    position: relative;
+    width: 100%;
+    margin-right: var(--spacing-lg);
+}
+
+@media (max-width: 946px) {
+    .search-bar {
+        max-width: 100%;
+        margin-right: 0;
+    }
+}
+
+.search-input {
+    width: 100%;
+    background-color: var(--bg-search-input);
+    flex: 1;
+}
+
+.search-bar-row {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* ── Results Table ──────────────────────────────────────────────────────────── */
+.results-table-container {
+    max-height: 50vh;
+    overflow-y: auto;
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.results-table th {
+    background-color: var(--bg-secondary);
+    padding: 0.75rem var(--spacing-md);
+    text-align: left;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 0.0625rem solid var(--border-color);
+}
+
+.results-table td {
+    padding: 0.75rem var(--spacing-md);
+    border-bottom: 0.0625rem solid var(--border-color);
+}
+
+.col-title {
+    max-width: 25rem;
+}
+
+.col-manage-filename .truncate {
+    max-width: 45vw;
+}
+
+@media (max-width: 946px) {
+    .col-manage-filename .truncate {
+        max-width: none;
+    }
+}
+
+/* Pending Renames modal — File Renames table. Filenames are shown in full on
+   every screen size; the table sizes to its content and the wrapper scrolls
+   horizontally (desktop and mobile) instead of truncating. */
+.rename-files-table th,
+.rename-files-table td {
+    white-space: nowrap;
+}
+
+.source-badge {
+    background-color: var(--bg-secondary);
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+}
+
+/* Touch/mobile: the status tooltip anchor is a tiny icon that is hard to hit.
+   Center it in a padded target, matching the small-button touch sizing
+   (`.btn-sm`: padded from 1200px, min-height from 946px). */
+@media (max-width: 946px) {
+    .profile-warning-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--spacing-xs);
+        padding: var(--spacing-sm) var(--spacing-md);
+        border-radius: var(--radius-sm);
+        min-height: 2.5rem;
+    }
+}
+
+.peer-counts {
+    display: flex;
+    gap: 0.75rem;
+    font-size: var(--font-size-sm);
+}
+
+.seeds {
+    color: var(--accent-primary);
+}
+
+.leechs {
+    color: var(--accent-danger);
+    opacity: 0.8;
+}
+
+/* ── Conflict Warning (batch file assign) ───────────────────────────────────── */
+.absolute-numbering-warning {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background-color: var(--accent-info-alpha-10);
+    border-top: 0.0625rem solid var(--accent-info-alpha-20);
+    color: var(--accent-info);
+    font-size: var(--font-size-sm);
+}
+
+.batch-conflict-warning {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background-color: var(--accent-warning-alpha-12);
+    border-top: 0.0625rem solid var(--accent-warning-alpha-40);
+    color: var(--accent-warning);
+    font-size: var(--font-size-sm);
+}
+
+.preview-conflict {
+    background-color: var(--accent-warning-alpha-20) !important;
+    color: var(--accent-warning) !important;
+    cursor: help;
+}
+
+/* ==========================================================================
+   20. Plugin Grid
+    ==========================================================================
+    Grid of plugin cards, including an "add new" dashed card at the end.
+    ========================================================================== */
+
+.plugin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15.625rem, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+.plugin-card {
+    background: var(--bg-secondary);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-xl);
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.2s;
+    min-height: 9.375rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.plugin-card.add-new {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 9.375rem;
+    background: var(--overlay-subtle);
+    border: 0.125rem dashed var(--overlay-border);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.plugin-card.add-new .icon-add-large {
+    font-size: 3rem;
+    color: var(--overlay-icon);
+}
+
+.plugin-card.add-new .text-add-new {
+    margin-top: var(--spacing-sm);
+    color: var(--overlay-text);
+}
+
+.plugin-type {
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.0625rem;
+}
+
+/* Plugin category badge (inside status cards) */
+.plugin-category-badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.1em 0.4em;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background-color: var(--overlay-subtle);
+    color: var(--text-muted);
+    vertical-align: middle;
+}
+
+/* ==========================================================================
+   21. System Pages
+    ==========================================================================
+    Logs viewer, health status, rename queue, about page — shared system
+    UI components.
+    ========================================================================== */
+
+/* ── System Logs ────────────────────────────────────────────────────────────── */
+
+.logs-timestamp {
+    font-size: var(--font-size-xs);
+    font-family: monospace;
+    width: 6.7rem;
+}
+
+.logs-timestamp span {
+    white-space: nowrap;
+}
+
+.log-level {
+    font-weight: 600;
+    flex: 0 0 5rem;
+    /* Fixed width */
+    text-align: center;
+}
+
+/* ── System Health ────────────────────────────────────────────────────────────── */
+.sys-health-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.sys-warning-icon-lg {
+    color: var(--accent-warning);
+    font-size: var(--font-size-lg);
+}
+
+.sys-badges-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+}
+
+.sys-cause-badge {
+    font-size: var(--font-size-xs);
+    padding: 0.15em 0.4em;
+    background: var(--surface-hover);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    border: 0.0625rem solid var(--border-color);
+}
+
+/* ── Rename Queue Modal ──────────────────────────────────────────────────────── */
+
+.sys-section-header {
+    margin: 0 0 var(--spacing-sm) 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: var(--font-size-xs);
+}
+
+.sys-changes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.sys-folder-change-add {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-sm);
+    background: var(--accent-primary-alpha-10);
+    font-size: var(--font-size-sm);
+    overflow: hidden;
+}
+
+.sys-folder-add-icon {
+    color: var(--accent-primary);
+    font-weight: 600;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.sys-folder-add-text {
+    color: var(--accent-primary);
+}
+
+.sys-folder-change-remove {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-sm);
+    background: var(--accent-danger-alpha-10);
+    font-size: var(--font-size-sm);
+    overflow: hidden;
+}
+
+.sys-folder-remove-icon {
+    color: var(--accent-danger);
+    font-weight: 600;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.396rem;
+    margin-left: 0.07rem;
+}
+
+.sys-folder-remove-text {
+    color: var(--accent-danger);
+}
+
+.sys-flex-col-lg {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-lg);
+}
+
+.sys-placeholder-box {
+    border-radius: var(--radius-md);
+}
+
+/* ── About Page ──────────────────────────────────────────────────────────────── */
+.about-info p {
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-base);
+    color: var(--text-secondary);
+}
+
+.about-info strong {
+    color: var(--text-primary);
+    min-width: 9.375rem;
+    display: inline-block;
+}
+
+/* ==========================================================================
+   22. Authentication UI
+    ==========================================================================
+    API key management table, calendar tokens, and auth status indicators.
+    ========================================================================== */
+
+.auth-table-container {
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+.auth-table-item-root {
+    border-bottom: 0.0625rem solid var(--border-color);
+    padding: 0.75rem;
+}
+
+.auth-btn-danger {
+    margin-right: auto;
+}
+
+/* Auth status dot indicators */
+.auth-status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.auth-status-active {
+    background-color: var(--accent-primary);
+    box-shadow: 0 0 0.5rem var(--accent-primary-alpha-50);
+}
+
+.auth-status-inactive {
+    background-color: var(--accent-warning);
+    box-shadow: 0 0 0.5rem var(--accent-warning-alpha-50);
+}
+
+/* API key code display */
+.auth-code-bg {
+    background: var(--bg-modifier-hover);
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--radius-sm);
+    margin-right: var(--spacing-md);
+}
+
+.auth-table-item-child {
+    padding-left: var(--spacing-lg);
+}
+
+.scope-list .form-group {
+    margin-bottom: 0.75rem;
+}
+.scope-list .auth-table-item-child .form-group {
+    margin-bottom: 1.25rem;
+}
+.scope-list > :last-child .form-group {
+    margin-top: var(--spacing-xs);
+    margin-bottom: var(--spacing-xs);
+}
+
+.calendar-url-name {
+    min-width: 8rem;
+}
+
+/* ==========================================================================
+   23. Animation Keyframes
+    ==========================================================================
+    All @keyframes definitions used throughout the stylesheet, collected here
+    to avoid scattering them across sections.
+    ========================================================================== */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(0.5rem);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+
+    to {
+        opacity: 1;
+        max-height: 62.5rem;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0.5;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Mobile sheet drag-dismiss: reverse of slideUp (sheet slides back down). */
+@keyframes sheetSlideOut {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateY(100%);
+        opacity: 0.5;
+    }
+}
+
+/* Overlay fade for drag-dismiss (paired with sheetSlideOut). */
+@keyframes modalFadeOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+@keyframes slideInTop {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes toast-indeterminate {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(400%);
+    }
+}
+
+@keyframes progress-decrease {
+    from {
+        transform: scaleX(1);
+    }
+
+    to {
+        transform: scaleX(0);
+    }
+}
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: -40rem 0;
+    }
+
+    100% {
+        background-position: 40rem 0;
+    }
+}
+
+@keyframes l26 {
+    12.5% {
+        box-shadow:
+            1.1875rem -1.1875rem 0 0rem,
+            2.375rem -1.1875rem 0 0rem,
+            3.5625rem -1.1875rem 0 0.3125rem,
+            1.1875rem 0 0 0.3125rem,
+            2.375rem 0 0 0rem,
+            3.5625rem 0 0 0.3125rem,
+            1.1875rem 1.1875rem 0 0rem,
+            2.375rem 1.1875rem 0 0rem,
+            3.5625rem 1.1875rem 0 0rem;
+    }
+
+    25% {
+        box-shadow:
+            1.1875rem -1.1875rem 0 0.3125rem,
+            2.375rem -1.1875rem 0 0rem,
+            3.5625rem -1.1875rem 0 0.3125rem,
+            1.1875rem 0 0 0rem,
+            2.375rem 0 0 0rem,
+            3.5625rem 0 0 0rem,
+            1.1875rem 1.1875rem 0 0rem,
+            2.375rem 1.1875rem 0 0.3125rem,
+            3.5625rem 1.1875rem 0 0rem;
+    }
+
+    50% {
+        box-shadow:
+            1.1875rem -1.1875rem 0 0.3125rem,
+            2.375rem -1.1875rem 0 0.3125rem,
+            3.5625rem -1.1875rem 0 0rem,
+            1.1875rem 0 0 0rem,
+            2.375rem 0 0 0rem,
+            3.5625rem 0 0 0rem,
+            1.1875rem 1.1875rem 0 0rem,
+            2.375rem 1.1875rem 0 0rem,
+            3.5625rem 1.1875rem 0 0.3125rem;
+    }
+
+    62.5% {
+        box-shadow:
+            1.1875rem -1.1875rem 0 0rem,
+            2.375rem -1.1875rem 0 0rem,
+            3.5625rem -1.1875rem 0 0rem,
+            1.1875rem 0 0 0.3125rem,
+            2.375rem 0 0 0rem,
+            3.5625rem 0 0 0rem,
+            1.1875rem 1.1875rem 0 0rem,
+            2.375rem 1.1875rem 0 0.3125rem,
+            3.5625rem 1.1875rem 0 0.3125rem;
+    }
+
+    75% {
+        box-shadow:
+            1.1875rem -1.1875rem 0 0rem,
+            2.375rem -1.1875rem 0 0.3125rem,
+            3.5625rem -1.1875rem 0 0rem,
+            1.1875rem 0 0 0rem,
+            2.375rem 0 0 0rem,
+            3.5625rem 0 0 0.3125rem,
+            1.1875rem 1.1875rem 0 0rem,
+            2.375rem 1.1875rem 0 0rem,
+            3.5625rem 1.1875rem 0 0.3125rem;
+    }
+
+    87.5% {
+        box-shadow:
+            1.1875rem -1.1875rem 0 0rem,
+            2.375rem -1.1875rem 0 0.3125rem,
+            3.5625rem -1.1875rem 0 0rem,
+            1.1875rem 0 0 0rem,
+            2.375rem 0 0 0.3125rem,
+            3.5625rem 0 0 0rem,
+            1.1875rem 1.1875rem 0 0.3125rem,
+            2.375rem 1.1875rem 0 0rem,
+            3.5625rem 1.1875rem 0 0rem;
+    }
+}
+
+@keyframes icon-pop {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.15);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes sys-breathe-danger {
+    0% {
+        opacity: 0.4;
+        filter: drop-shadow(0 0 0.125rem var(--accent-danger-alpha-30));
+    }
+
+    50% {
+        opacity: 1;
+        filter: drop-shadow(0 0 0.5rem var(--accent-danger));
+    }
+
+    100% {
+        opacity: 0.4;
+        filter: drop-shadow(0 0 0.125rem var(--accent-danger-alpha-30));
+    }
+}
+
+@keyframes new-files-wave {
+    0% {
+        box-shadow:
+            0 0 0 0 rgba(245, 158, 11, 0.6),
+            0 0 0 0 rgba(245, 158, 11, 0.3);
+    }
+
+    50% {
+        box-shadow:
+            0 0 0 0.4rem rgba(245, 158, 11, 0.2),
+            0 0 0 0.8rem rgba(245, 158, 11, 0.05);
+    }
+
+    100% {
+        box-shadow:
+            0 0 0 0.6rem rgba(245, 158, 11, 0),
+            0 0 0 1rem rgba(245, 158, 11, 0);
+    }
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.85;
+        transform: scale(1.03);
+    }
+}
+
+.pulsate {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   24. Scrollbar Styling
+    ==========================================================================
+    Custom scrollbar for WebKit browsers (Chromium, Safari, Edge) that
+    matches the dark theme.
+    ========================================================================== */
+
+::-webkit-scrollbar {
+    width: 0.5rem;
+    height: 0.5rem;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+/* ==========================================================================
+   25. Utility Classes
+    ==========================================================================
+    Atomic utility classes for rapid layout: typography (text sizes, weights,
+    colours), spacing (margin/padding per side per scale), flexbox/grid
+    helpers, sizing, borders, display, and misc utilities. These follow a
+    consistent naming convention so they can be composed directly in JSX.
+    ========================================================================== */
+
+/* ── Typography ──────────────────────────────────────────────────────────────── */
+.text-xs {
+    font-size: var(--font-size-xs);
+}
+
+.line-through {
+    text-decoration: line-through;
+}
+
+.text-sm {
+    font-size: var(--font-size-sm);
+}
+
+.text-base {
+    font-size: var(--font-base);
+}
+
+.text-lg {
+    font-size: var(--font-size-lg);
+}
+
+.text-xl {
+    font-size: var(--font-size-xl);
+}
+
+.font-normal {
+    font-weight: var(--font-weight-normal);
+}
+
+.font-medium {
+    font-weight: var(--font-weight-medium);
+}
+
+.font-semibold {
+    font-weight: var(--font-weight-semibold);
+}
+
+.font-bold {
+    font-weight: var(--font-weight-bold);
+}
+
+.text-left {
+    text-align: left;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-primary-color {
+    color: var(--text-primary);
+}
+
+.text-secondary-color {
+    color: var(--text-secondary);
+}
+
+.text-muted-color {
+    color: var(--text-muted);
+}
+
+.text-danger {
+    color: var(--accent-danger);
+}
+
+.text-success {
+    color: var(--accent-primary, var(--accent-primary));
+}
+
+.text-warning {
+    color: var(--accent-warning);
+}
+
+.text-primary {
+    color: var(--accent-primary);
+}
+
+/* Single-line truncation. Works on block elements and on flex items (which are
+   blockified). Add `min-w-0` to any ancestor flex item that must be allowed to
+   shrink, and pair with a `title` attribute so the full value stays reachable. */
+.truncate {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Filesystem paths: stay on a single line and ellipsize once they exceed a
+   generous width, so a long path can't stretch a table column or a card.
+   The full value stays reachable through the `title` attribute. */
+.path-truncate {
+    display: block;
+    max-width: 30rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.text-xs-muted {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+.font-mono {
+    font-family: monospace;
+}
+
+.whitespace-nowrap {
+    white-space: nowrap;
+}
+
+.whitespace-pre-wrap {
+    white-space: pre-wrap;
+}
+
+/* ── Margin ─────────────────────────────────────────────────────────────────── */
+.m-0 {
+    margin: 0;
+}
+
+.mt-0 {
+    margin-top: 0;
+}
+
+.mb-0 {
+    margin-bottom: 0;
+}
+
+.mt-xs {
+    margin-top: var(--spacing-xs);
+}
+
+.mb-xs {
+    margin-bottom: var(--spacing-xs);
+}
+
+.ml-xs {
+    margin-left: var(--spacing-xs);
+}
+
+.mr-xs {
+    margin-right: var(--spacing-xs);
+}
+
+.mt-sm {
+    margin-top: var(--spacing-sm);
+}
+
+.mb-sm {
+    margin-bottom: var(--spacing-sm);
+}
+
+.ml-sm {
+    margin-left: var(--spacing-sm);
+}
+
+.mr-sm {
+    margin-right: var(--spacing-sm);
+}
+
+.mx-sm {
+    margin-left: var(--spacing-sm);
+    margin-right: var(--spacing-sm);
+}
+
+.my-sm {
+    margin-top: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.mt-md {
+    margin-top: var(--spacing-md);
+}
+
+.mb-md {
+    margin-bottom: var(--spacing-md);
+}
+
+.mr-md {
+    margin-right: var(--spacing-md);
+}
+
+.mt-lg {
+    margin-top: var(--spacing-lg);
+}
+
+.mb-lg {
+    margin-bottom: var(--spacing-lg);
+}
+
+.mt-xl {
+    margin-top: var(--spacing-xl);
+}
+
+.mb-xl {
+    margin-bottom: var(--spacing-xl);
+}
+
+.ml-auto {
+    margin-left: auto;
+}
+
+/* ── Padding ────────────────────────────────────────────────────────────────── */
+.p-0 {
+    padding: 0;
+}
+
+.pt-0 {
+    padding-top: 0;
+}
+
+.p-xs {
+    padding: var(--spacing-xs);
+}
+
+.py-xs {
+    padding-top: var(--spacing-xs);
+    padding-bottom: var(--spacing-xs);
+}
+
+.p-sm {
+    padding: var(--spacing-sm);
+}
+
+.pt-sm {
+    padding-top: var(--spacing-sm);
+}
+
+.p-md {
+    padding: var(--spacing-md);
+}
+
+.pt-md {
+    padding-top: var(--spacing-md);
+}
+
+.pb-md {
+    padding-bottom: var(--spacing-md);
+}
+
+.pl-md {
+    padding-left: var(--spacing-md);
+}
+
+.pr-md {
+    padding-right: var(--spacing-md);
+}
+
+.p-lg {
+    padding: var(--spacing-lg);
+}
+
+.p-xl {
+    padding: var(--spacing-xl);
+}
+
+/* ── Flexbox ────────────────────────────────────────────────────────────────── */
+.flex {
+    display: flex;
+}
+
+.flex-col {
+    display: flex;
+    flex-direction: column;
+}
+
+.flex-row {
+    display: flex;
+    flex-direction: row;
+}
+
+.flex-1 {
+    flex: 1;
+}
+
+.flex-shrink-0 {
+    flex-shrink: 0;
+}
+
+.flex-wrap {
+    flex-wrap: wrap;
+}
+
+.self-center {
+    align-self: center;
+}
+
+.self-end {
+    align-self: end;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.items-start {
+    align-items: flex-start;
+}
+
+.items-end {
+    align-items: flex-end;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.justify-end {
+    justify-content: flex-end;
+}
+
+@media (max-width: 946px) {
+    .justify-evenly-mobile {
+        justify-content: space-evenly;
+    }
+}
+
+/* ── Flex Gap ───────────────────────────────────────────────────────────────── */
+.gap-xs {
+    gap: var(--spacing-xs);
+}
+
+.gap-sm {
+    gap: var(--spacing-sm);
+}
+
+.gap-md {
+    gap: var(--spacing-md);
+}
+
+.gap-lg {
+    gap: var(--spacing-lg);
+}
+
+.gap-0 {
+    gap: 0;
+}
+
+/* ── Grid ────────────────────────────────────────────────────────────────────── */
+.grid {
+    display: grid;
+}
+
+.grid-cols-1 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) {
+    .grid-md-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* ── Sizing ─────────────────────────────────────────────────────────────────── */
+.w-full {
+    width: 100%;
+}
+
+.w-auto {
+    width: auto;
+}
+
+.w-10 {
+    width: 10%;
+}
+
+.w-15 {
+    width: 15%;
+}
+
+.min-w-0 {
+    min-width: 0;
+}
+
+.modal-footer-btn {
+    justify-content: center;
+}
+
+.modal-footer-btn--wide {
+    min-width: 7.2rem;
+}
+
+.modal-footer-btn--narrow {
+    min-width: 5.2rem;
+}
+
+.overflow-wrap-anywhere {
+    overflow-wrap: anywhere;
+}
+
+.footer-right {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+@media (max-width: 946px) {
+    .footer-left {
+        width: 50%;
+        display: flex;
+    }
+    .footer-right {
+        width: 100%;
+        display: flex;
+    }
+
+    .footer-left .btn,
+    .footer-right .btn {
+        flex: 1;
+    }
+}
+@media (max-width: 380px) {
+    .footer-left {
+        width: 100%;
+        display: flex;
+    }
+}
+
+/* ── Borders ────────────────────────────────────────────────────────────────── */
+.border-b {
+    border-bottom: 0.0625rem solid var(--border-color);
+}
+
+.border-t {
+    border-top: 0.0625rem solid var(--border-color);
+}
+
+.border {
+    border: 0.0625rem solid var(--border-color);
+}
+
+.border-radius {
+    border-radius: var(--border-radius);
+}
+
+/* ── Backgrounds ────────────────────────────────────────────────────────────── */
+.bg-secondary {
+    background-color: var(--bg-secondary);
+}
+
+.bg-primary {
+    background-color: var(--bg-primary);
+}
+
+.bg-warning {
+    background-color: var(--accent-warning);
+}
+
+.bg-primary-block {
+    background: var(--bg-primary);
+}
+
+/* ── Display / Visibility ──────────────────────────────────────────────────── */
+.hidden {
+    display: none !important;
+}
+
+.block {
+    display: block;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.pointer-events-none {
+    pointer-events: none;
+}
+
+/* ── Misc ───────────────────────────────────────────────────────────────────── */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+.align-middle {
+    vertical-align: middle;
+}
+#manual-ban-settings {
+    display: flex;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    align-items: flex-end;
+    padding-top: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+#manual-ban-settings .form-group:first-child {
+    min-width: 10rem;
+    flex: 1;
+}
+
+#manual-ban-settings .form-group:last-child {
+    min-width: 10rem;
+    flex: 1;
+}
+
+/* ── Form section header ────────────────────────────────────────────────────── */
+.form-section-header {
+    font-weight: 600;
+    font-size: var(--font-base);
+    border-bottom: 0.0625rem solid var(--border-color);
+    padding-bottom: var(--spacing-sm);
+}
+
+/* ── Card row with badge (mobile) ────────────────────────────────────────────
+   Content + badge side by side; the badge stays fixed while the content
+   shrinks and truncates.  Used inside mobile card views from TableBuilder.
+   ========================================================================== */
+.card-row-with-badge {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+}
+
+/* Variant used by the organized-series cards: the badge is floated to the top
+   right so the folder name and path flow around it instead of the badge
+   claiming a full column and squeezing the text. */
+.card-row-with-badge--wrap {
+    display: block;
+}
+
+.card-row-with-badge--wrap .card-badge-float {
+    float: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--spacing-xs);
+    margin-left: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+.card-row-with-badge--wrap .card-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Float (not inline-block) so the bottom margin only pushes content that flows
+   below the checkbox — e.g. a wrapped title or the path — instead of growing the
+   shared line box and shifting a side-by-side title. */
+.card-row-with-badge--wrap .card-text-checkbox {
+    float: left;
+    margin-right: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Must clear the floated checkbox, otherwise the path's first line would be
+   shortened and start to the right of the checkbox. */
+.card-row-with-badge--wrap .card-text-path {
+    clear: left;
+}
+
+.card-row-title {
+    display: block;
+}
+
+/* Width/display caps for the `.truncate` utility. */
+.series-title-truncate,
+.media-title-truncate {
+    max-width: 12.5rem;
+    min-width: 100%;
+    display: block;
+}
+
+/* ── Misc Component-specific ────────────────────────────────────────────────── */
+
+/* ── Pagination Footer ───────────────────────────────────────────────────────
+   `PaginationControl` teleports its bar into this slot at the bottom of
+   `.main-content`, below the scrolling `.content`. The slot collapses on pages
+   that don't render pagination, so it takes no space there. */
+.pagination-footer-slot:not(:has(.pagination-control)) {
+    display: none;
+}
+
+.pagination-footer-slot {
+    flex-shrink: 0;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--bg-secondary);
+    border-top: 0.0625rem solid var(--border-color);
+    box-shadow: 0 -0.25rem 0.5rem -0.25rem var(--black-alpha-20);
+}
+
+/* The `<Portal>` wrapper div: align the controls with the page content width. */
+.pagination-footer-slot > div {
+    max-width: var(--content-max-width);
+    margin: 0 auto;
+}
+
+@media (max-width: 946px) {
+    .pagination-footer-slot {
+        padding: var(--spacing-sm) var(--spacing-xl)
+            var(--mobile-footer-padding-bottom);
+    }
+}
+
+.pagination-control {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm) var(--spacing-md);
+    padding: 0;
+}
+
+.pagination-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm) var(--spacing-md);
+}
+
+.pagination-jump {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.pagination-jump .form-input {
+    width: 5rem;
+}
+
+@media (max-width: 946px) {
+    .pagination-control {
+        width: 100%;
+        gap: var(--spacing-md);
+    }
+
+    /* Page count, jump field and Go button share the full width. The Go button
+       column is a quarter of the control width — i.e. exactly half of the
+       `Next` button, which spans half the row in `.pagination-btns`. */
+    .pagination-info {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) calc(
+                (100% - var(--spacing-sm)) / 4
+            );
+        align-items: center;
+        width: 100%;
+        gap: 0 var(--spacing-sm);
+    }
+
+    .page-numbers {
+        white-space: nowrap;
+    }
+
+    /* Dissolve the jump wrapper so the field and Go button are placed by the
+       grid above instead of a nested flex row. */
+    .pagination-jump {
+        display: contents;
+    }
+
+    .pagination-jump .form-input {
+        width: auto;
+        min-width: 0;
+    }
+
+    .btn-pair {
+        flex: 1;
+    }
+
+    .pagination-btns {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        gap: var(--spacing-sm);
+    }
+}
+
+@media (max-width: 946px) {
+    #auto-profiles-buttons {
+        display: grid;
+    }
+
+    #auto-profiles-buttons > :nth-child(1) {
+        order: 3;
+    }
+
+    #auto-profiles-buttons > :nth-child(2) {
+        order: 2;
+    }
+
+    #auto-profiles-buttons > :nth-child(3) {
+        order: 1;
+    }
+}
+
+/* ── Automatic Profile Category Cards ───────────────────────────────────────── */
+.auto-profile-category-card {
+    padding: var(--spacing-md);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+}
+
+/* Dimmed while FFmpeg is unavailable: the rule still applies but can't be edited. */
+.auto-profile-category-card.is-disabled {
+    opacity: 0.7;
+    filter: grayscale(0.5);
+}
+
+/* "Add New Category" panel. */
+.auto-profile-add-category {
+    padding: var(--spacing-md);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: var(--bg-primary);
+}
+
+/* Desktop: icon + label buttons share a fixed width. On mobile the labels are
+   hidden (see `.desktop-only`), so the buttons shrink to icon-only width. */
+.episodes-header-btn {
+    width: 5.5rem;
+    justify-content: center;
+}
+
+@media (max-width: 946px) {
+    .episodes-header-btn {
+        width: auto;
+    }
+}
+
+/* ── Icon sizes ─────────────────────────────────────────────────────────────── */
+
+.status-icon {
+    display: inline-block;
+    width: fit-content;
+}
+
+.icon-1rem {
+    font-size: var(--font-base);
+}
+
+/* ── Settings description text ──────────────────────────────────────────────── */
+.settings-description {
+    margin-top: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+}
+
+/* ── Responsive Visibility ──────────────────────────────────────────────────── */
+.mobile-only {
+    display: none !important;
+}
+
+@media (max-width: 946px) {
+    .mobile-only {
+        display: block !important;
+    }
+
+    .desktop-only {
+        display: none !important;
+    }
+}
+
+.hide-week-on-desktop {
+    display: none;
+}
+
+@media (max-width: 946px) {
+    .hide-week-on-desktop {
+        display: block !important;
+    }
+}
+
+.hide-mobile {
+    display: inherit;
+}
+
+@media (max-width: 946px) {
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
+.hide-desktop {
+    display: none !important;
+}
+
+@media (max-width: 946px) {
+    .hide-desktop {
+        display: flex !important;
+    }
+}
+
+/* ── Mobile Series Library Card ──────────────────────────────────────────────── */
+/* Ensure the quality label stays on the same row as the title on narrow screens */
+@media (max-width: 946px) {
+    #series-library-header,
+    #organized-series-header {
+        flex-direction: column-reverse;
+    }
+
+    .series-lib-card .series-lib-card-row {
+        min-width: 0;
+        overflow: hidden;
+        /* Top-align to match the organized-series card, where the checkbox is
+           floated and the title text sits at its top. */
+        align-items: flex-start;
+    }
+
+    .series-lib-card .series-lib-card-title {
+        min-width: 0;
+        overflow: hidden;
+        align-items: flex-start;
+    }
+
+    /* `input[type="checkbox"]` sets `align-self: center`; override it so the
+       checkbox's top lines up with the title text. */
+    .series-lib-card .series-lib-card-title .table-checkbox {
+        align-self: flex-start;
+    }
+
+    .series-lib-card .cell-quality {
+        flex-shrink: 0;
+        min-width: 4rem;
+        max-width: 45%;
+        text-align: right;
+    }
+
+    .series-lib-card .series-lib-card-meta {
+        min-width: 0;
+        gap: var(--spacing-sm);
+    }
+
+    /* Seasons yield space first; episodes keep their intrinsic size */
+    .series-lib-card .series-lib-card-seasons {
+        flex: 1 1 auto;
+    }
+
+    .series-lib-card .series-lib-card-episodes {
+        flex: 0 1 auto;
+    }
+}
+
+/* ── Word-break utility ──────────────────────────────────────────────────────── */
+.break-all {
+    overflow-wrap: anywhere;
+    word-break: break-all;
+}
+
+.break-normal {
+    word-break: normal;
+    overflow-wrap: normal;
+}
+
+/* ── View containers (used for tab/section switching) ───────────────────────── */
+.view {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.view.active {
+    display: block;
+}
+
+/* ── Arrows on number inputs ───────────────────────────────────────────────── */
+/* Chrome, Safari, Edge */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* ── Activity Type Filter Buttons ─────────────────────────────────────────── */
+.activity-type-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: var(--spacing-md) var(--spacing-md);
+    border-radius: 0.375rem;
+    font-size: var(--font-size-sm);
+    transition: var(--transition);
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    width: 100%;
+    text-align: left;
+}
+
+.activity-type-btn-off {
+    background-color: var(--bg-secondary);
+    color: var(--text-muted);
+}
+
+.activity-type-btn-on {
+    background-color: var(--bg-tertiary);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.unselectable,
+.plugin-category-badge,
+thead th {
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.selectable {
+    -webkit-user-select: text; /* Safari */
+    -ms-user-select: text; /* IE 10 and Edge */
+    user-select: text; /* Modern standard browsers */
+}
+
+/* ── Timestamp Display (used in logs & search results) ───────────────────── */
+.timestamp-cell {
+    min-width: 4rem;
+}
+
+/* ── Empty State / Placeholder Content ───────────────────────────────────── */
+.empty-state-body {
+    padding: var(--spacing-lg);
+    text-align: center;
+    color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Hover effects
+   -------------------------------------------------------------------------
+   All :hover styling lives here behind a single capability gate, so
+   hover feedback is defined in one place and never leaks onto touch or
+   mobile layouts. Add new hover styles to this block only.
+   ========================================================================== */
+@media (hover: hover) {
+    .settings-section:hover {
+        border-color: var(--bg-hover);
+    }
+
+    .nav-item:hover {
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+
+    .nav-item:hover .nav-icon {
+        opacity: 1;
+    }
+
+    .card:hover {
+        border-color: var(--bg-hover);
+        box-shadow: 0 0.5rem 1rem var(--black-alpha-15);
+    }
+
+    #status .status-card:hover {
+        border-color: var(--bg-hover);
+    }
+
+    .status-card.clickable:hover {
+        border-color: var(--accent-primary);
+        transform: translateY(-0.125rem);
+        box-shadow: 0 0.25rem 0.75rem var(--black-alpha-20);
+    }
+
+    .btn:hover {
+        background-color: var(--bg-hover);
+        transform: translateY(-0.0625rem);
+        box-shadow: 0 0.25rem 0.75rem var(--black-alpha-20);
+    }
+
+    .btn-primary:hover:not(:disabled):not(.disabled) {
+        background-color: var(--accent-primary-hover);
+        box-shadow: 0 0.375rem 1rem var(--accent-primary-alpha-35);
+    }
+
+    .btn-secondary:hover:not(:disabled):not(.disabled) {
+        background-color: var(--accent-secondary-hover);
+        box-shadow: 0 0.375rem 1rem var(--accent-secondary-alpha-35);
+    }
+
+    .btn-ghost:hover {
+        background-color: var(--bg-tertiary);
+        border-color: var(--bg-hover);
+    }
+
+    .btn-danger:hover:not(:disabled):not(.disabled) {
+        background-color: var(--accent-danger);
+        color: var(--white);
+        border-color: var(--accent-danger);
+        box-shadow: 0 0.25rem 0.75rem var(--accent-danger-alpha-25);
+    }
+
+    .bg-info-white:hover {
+        background: var(--accent-info-hover);
+    }
+
+    .btn-icon:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .btn-action:hover {
+        background-color: var(--blue-alpha-10);
+    }
+
+    .btn-arrow:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    tr:hover:not(:has(button:hover)) td {
+        background-color: var(--bg-hover);
+    }
+
+    /* The empty-state sentinel row must stay visually inert on hover. */
+    tr.table-empty-sentinel:hover:not(:has(button:hover)) td {
+        background-color: transparent;
+    }
+
+    th.cursor-pointer:hover {
+        background-color: var(--bg-hover);
+    }
+
+    .form-field-wrapper .form-field-icon-right:hover {
+        color: var(--text-primary);
+        background-color: var(--bg-tertiary);
+        transform: translateY(-50%);
+        box-shadow: none;
+    }
+
+    .form-field-icon-right:hover {
+        background-color: var(--accent-primary-alpha-10) !important;
+        color: var(--accent-primary);
+        opacity: 1;
+        transform: none;
+        box-shadow: none !important;
+    }
+
+    /* `:not(:focus)` keeps the focus border from being overridden while an
+       element is both hovered and focused — the focus rules are declared
+       earlier, so an unguarded hover rule of equal specificity would win. */
+    input:hover:not(:focus),
+    select:hover:not(:focus),
+    textarea:hover:not(:focus) {
+        border-color: var(--bg-hover);
+    }
+
+    input[type="checkbox"]:hover:not(:focus) {
+        border-color: var(--bg-hover);
+    }
+
+    .season-accordion:hover {
+        box-shadow: 0 0.25rem 0.75rem var(--black-alpha-15);
+    }
+
+    .season-header:hover {
+        background-color: var(--bg-hover);
+    }
+
+    .episode-cell:hover:not(.out-of-range) {
+        background-color: var(--bg-hover);
+        transform: translateY(-0.0625rem);
+        box-shadow: 0 0.25rem 0.75rem var(--black-alpha-30);
+    }
+
+    .episode-cell.show-only-downloaded:hover {
+        opacity: 0.8;
+        box-shadow: 0 0 0 0.125rem var(--accent-primary-alpha-20);
+    }
+
+    .episode-cell.missing:hover {
+        border-color: var(--accent-danger);
+        box-shadow: 0 0 0 0.1875rem var(--accent-danger-alpha-20);
+    }
+
+    .episode-cell.in-queue:hover {
+        border-color: var(--accent-warning);
+        box-shadow: 0 0 0 0.1875rem var(--accent-warning-alpha-20);
+    }
+
+    .episode-cell.unreleased:hover {
+        border-color: var(--accent-info);
+        box-shadow: 0 0 0 0.1875rem var(--accent-info-alpha-20);
+    }
+
+    .calendar-day:hover {
+        background-color: var(--bg-secondary);
+    }
+
+    .calendar-event-more:hover {
+        background-color: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .calendar-event:hover {
+        background-color: var(--accent-secondary-hover);
+    }
+
+    .calendar-event.downloaded:hover {
+        background-color: var(--accent-primary-hover);
+    }
+
+    .calendar-event.missing:hover {
+        background-color: var(--accent-danger-hover);
+    }
+
+    .calendar-event.upcoming:hover {
+        background-color: var(--accent-info-hover);
+    }
+
+    .calendar-event.out-of-range:hover {
+        background-color: var(--bg-hover);
+    }
+
+    .calendar-week-day-separator:hover {
+        color: var(--text-primary);
+    }
+
+    .view-toggle-btn:hover {
+        color: var(--text-primary);
+    }
+
+    .episode-part-card:hover {
+        border-color: var(--accent-secondary);
+    }
+
+    .back-btn:hover {
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+
+    .edit-tab:hover {
+        color: var(--text-primary);
+    }
+
+    .edit-tab:hover {
+        text-decoration: none;
+    }
+
+    .inheritance-toggle:hover {
+        background-color: var(--accent-info-alpha-20);
+    }
+
+    .season-override-section:hover {
+        border-color: var(--bg-hover);
+    }
+
+    .login-btn:hover:not(:disabled) {
+        background-color: var(--accent-primary-hover);
+        transform: translateY(-0.0625rem);
+        box-shadow: 0 0.375rem 1rem var(--accent-primary-alpha-35);
+    }
+
+    .help-icon:hover {
+        color: var(--accent-info);
+        border-color: var(--accent-info);
+        background-color: var(--bg-hover);
+    }
+
+    .tooltip-host:hover .tooltip-content {
+        visibility: visible;
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .toast:hover {
+        transform: translateX(-0.25rem);
+        box-shadow:
+            0 0.75rem 1.25rem -0.1875rem var(--black-alpha-60),
+            0 0.375rem 0.5rem -0.125rem var(--black-alpha-40);
+    }
+
+    .toast-close:hover {
+        background-color: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .toast-control-btn:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .toast-control-btn-danger:hover {
+        background: var(--accent-danger-alpha-10);
+        border-color: var(--accent-danger);
+    }
+
+    .results-table tr:hover {
+        background-color: var(--bg-hover);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--bg-hover);
+    }
+
+    .activity-type-btn:hover {
+        color: var(--text-primary);
+    }
+
+    .activity-type-btn-on:hover {
+        color: var(--text-primary);
+    }
+}

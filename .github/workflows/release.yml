@@ -1,0 +1,1213 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: write
+  packages: write
+env:
+  TRUNK_VERSION: v0.21.14
+  CARGO_HTTP_MULTIPLEXING: false
+
+jobs:
+  # ── Version gate ──────────────────────────────────────────────────────────
+  # Lightweight check that runs on every push to main. If the version in
+  # Cargo.toml already has a matching release, everything downstream is skipped
+  # (shown as "Skipped" in the UI — not a failure).
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      is_new: ${{ steps.check.outputs.is_new }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Check if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep '^version =' backend/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "is_new=false" >> "$GITHUB_OUTPUT"
+          echo "✔ Release $TAG already exists — nothing to do."
+          else
+          echo "is_new=true" >> "$GITHUB_OUTPUT"
+          echo "New version $VERSION detected — running full pipeline."
+          fi
+
+          # ── Linux CI (full suite) ────────────────────────────────────────────────
+          # Builds everything, runs Clippy, unit tests, WASM tests, and Playwright
+          # E2E tests. Only runs when check-version detects a new version.
+  linux-test:
+    needs: [check-version]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: ubuntu-latest
+
+    env:
+      # CI does not need debug symbols for unit/integration tests.
+      # This substantially reduces target/ size.
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_TEST_DEBUG: 0
+
+        # Incremental compilation is useful locally but wastes disk space in CI.
+      CARGO_INCREMENTAL: 0
+
+        # Avoid generating huge compiler artifacts that aren't needed by CI.
+      CARGO_PROFILE_DEV_INCREMENTAL: false
+      CARGO_PROFILE_TEST_INCREMENTAL: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+          components: clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install System Dependencies
+        uses: ./.github/actions/install-system-deps
+
+      - name: Show linker environment
+        run: |
+          echo "=== Rust ==="
+          rustc --version --verbose
+          cargo --version
+          rustup show
+
+          echo "=== Clang ==="
+          clang --version
+
+          echo "=== Linkers ==="
+          command -v ld || true
+          command -v ld.lld || true
+          command -v ld.gold || true
+          command -v mold || true
+
+          if command -v ld.lld >/dev/null 2>&1; then
+          ld.lld --version
+          fi
+
+          if command -v mold >/dev/null 2>&1; then
+          mold --version
+          fi
+
+          echo "=== Environment ==="
+          env | grep -E '^(RUSTFLAGS|CC|CXX|LD|AR|CARGO_TARGET)' || true
+
+      - name: Cache sccache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/sccache
+          key: ${{ runner.os }}-sccache-${{ hashFiles('rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-
+
+      - name: Install Trunk
+        uses: ./.github/actions/install-trunk
+        with:
+          version: ${{ env.TRUNK_VERSION }}
+
+      - name: Build Frontend (Trunk)
+        run: |
+          cd frontend
+          trunk build --release
+
+      - name: Remove WASM build artifacts
+        run: |
+          rm -rf target/wasm32-unknown-unknown
+
+          echo "Disk usage after WASM cleanup:"
+          df -h .
+          du -sh target 2>/dev/null || true
+
+      - name: Clippy
+        run: |
+          source "$HOME/.cargo/env"
+          cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+
+      - name: Enforce frontend logging SSoT
+        run: |
+          # All frontend logging must go through the release-gated macros in
+          # frontend/src/utils/debug.rs (debug_log!/debug_warn!/debug_error!).
+          # Direct leptos::logging / web_sys::console calls are not release-gated
+          # and would leak console output into production builds.
+          if grep -rnE 'leptos::logging|web_sys::console' frontend/src --include='*.rs' \
+              | grep -v 'frontend/src/utils/debug.rs'; then
+            echo "::error::Frontend logging SSoT violation — use crate::debug_log!/debug_warn!/debug_error! (see frontend/src/utils/debug.rs)"
+            exit 1
+          fi
+
+      - name: Run Tests
+        run: |
+          cargo test --locked --workspace
+
+      - name: Compile dummy-rust example plugin
+        run: |
+          cargo check --locked --manifest-path examples/plugins/dummy-rust/Cargo.toml
+
+      - name: Show disk usage before WASM tests
+        run: |
+          echo "=== Filesystem ==="
+          df -h .
+
+          echo "=== target ==="
+          du -sh target 2>/dev/null || true
+
+          echo "=== target/debug ==="
+          du -sh target/debug 2>/dev/null || true
+
+          echo "=== Largest target directories ==="
+          du -h -d 2 target 2>/dev/null | sort -h | tail -30 || true
+
+      - name: Preserve Jumbie binary
+        run: |
+          mkdir -p /tmp/playwright-bin
+          cp target/debug/jumbie /tmp/playwright-bin/jumbie
+
+      - name: Clean native build
+        run: |
+          # Remove the enormous native debug tree before wasm-pack.
+          # The only native artifact needed later is the Jumbie binary
+          # used by Playwright's webServer.
+          rm -rf target/debug
+
+          mkdir -p target/debug
+          cp /tmp/playwright-bin/jumbie target/debug/jumbie
+
+          rm -rf /tmp/playwright-bin
+
+          echo "Disk usage after native cleanup:"
+          df -h .
+          du -sh target 2>/dev/null || true
+
+      - name: Install wasm-pack
+        run: |
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          fi
+
+          wasm-pack --version
+
+      - name: Run WASM Tests
+        run: |
+          cd frontend
+          wasm-pack test --node
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Install Playwright and dependencies
+        run: |
+          cd tests/e2e
+          npm ci
+          npx playwright install --with-deps
+
+      - name: Run Playwright tests
+        run: |
+          cd tests/e2e
+          npx playwright test
+          # --- Windows backend CI -----------------------------------------------------
+          # Validates that the backend compiles and all unit/integration tests pass on
+          # Windows. The frontend (Trunk, wasm-pack, Playwright) and Docker steps are
+          # Linux-only and are intentionally excluded here.
+  windows-test:
+    needs: [check-version]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup MSVC build environment
+        shell: powershell
+        run: |
+          # GitHub's hosted Windows runners already run vcvars64, but local
+          # act runs do not. Find and source it, then persist the environment
+          # for subsequent steps (no-op on GitHub runners).
+          $vcvars = $null
+          $editions = @('Community', 'Enterprise', 'BuildTools', 'Professional')
+          $years = @('2022', '2019')
+          $baseDirs = @(
+          "${env:ProgramFiles}\Microsoft Visual Studio",
+          "${env:ProgramFiles(x86)}\Microsoft Visual Studio"
+          )
+          foreach ($base in $baseDirs) {
+          foreach ($year in $years) {
+          foreach ($ed in $editions) {
+          $candidate = "$base\$year\$ed\VC\Auxiliary\Build\vcvars64.bat"
+          if (Test-Path $candidate) {
+          $vcvars = $candidate
+          break
+          }
+          }
+          if ($vcvars) { break }
+          }
+          if ($vcvars) { break }
+          }
+          # Fallback: use vswhere to locate VS
+          if (-not $vcvars) {
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+          $vspath = & $vswhere -latest -property installationPath
+          if ($vspath) {
+          $candidate = Join-Path $vspath "VC\Auxiliary\Build\vcvars64.bat"
+          if (Test-Path $candidate) { $vcvars = $candidate }
+          }
+          }
+          }
+          if ($vcvars) {
+          Write-Output "Found vcvars64.bat at: $vcvars"
+          # Source the batch file and capture the environment it sets
+          cmd /c "`"$vcvars`" > nul 2>&1 && set" | ForEach-Object {
+          if ($_ -match '^([^=]+)=(.*)') {
+          $key = $matches[1]
+          $val = $matches[2]
+          if ($key -eq 'PATH') {
+          $val | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+          "$key=$val" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+          }
+          }
+          } else {
+          Write-Output "Warning: vcvars64.bat not found. Cargo may fail without MSVC tools."
+          }
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Validate WXS installer XML
+        shell: powershell
+        run: |
+          [xml](Get-Content backend/windows/jumbie.wxs)
+          Write-Output "jumbie.wxs is valid XML"
+
+      - name: Install ffmpeg
+        shell: powershell
+        run: |
+          # Skip if ffmpeg is already on PATH
+          if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
+          Write-Output "ffmpeg already available on PATH, skipping"
+          } else {
+          $ffmpegBin = "$env:USERPROFILE\ffmpeg\bin"
+
+          if (Test-Path "$ffmpegBin\ffmpeg.exe") {
+          "$ffmpegBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Output "ffmpeg already installed at $ffmpegBin, added to PATH"
+          } else {
+          # winget available on real runners but not in `act` containers
+          $winget = Get-Command winget -ErrorAction SilentlyContinue
+
+          if ($winget) {
+          $installed = winget list --id Gyan.FFmpeg --exact --accept-source-agreements 2>$null
+
+          if ($LASTEXITCODE -eq 0 -and $installed -match 'ffmpeg') {
+          Write-Output "ffmpeg already installed via winget"
+          } else {
+          winget install -e --id Gyan.FFmpeg `
+          --source winget `
+          --accept-package-agreements `
+          --accept-source-agreements
+          }
+
+          # Refresh PATH after winget modifies it
+          $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+          $machinePath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
+          $env:PATH = "$userPath;$machinePath"
+
+          $ffmpegCommand = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
+
+          if (-not $ffmpegCommand) {
+          throw "FFmpeg was installed but could not be found"
+          }
+
+          $ffmpegCommand.Source | Split-Path |
+          Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          Write-Output "Added FFmpeg to GITHUB_PATH: $($ffmpegCommand.Source | Split-Path)"
+          } else {
+          Write-Output "winget not available, downloading ffmpeg directly..."
+
+          $zip = "$env:TEMP\ffmpeg.zip"
+          $extractDir = "$env:USERPROFILE\ffmpeg"
+
+          Invoke-WebRequest `
+          -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" `
+          -OutFile $zip
+
+          Expand-Archive $zip -DestinationPath $extractDir -Force
+
+          $dir = Get-ChildItem $extractDir -Directory |
+          Select-Object -First 1
+
+          if (-not $dir) {
+          throw "Could not find extracted FFmpeg directory"
+          }
+
+          $actualBin = Join-Path $dir.FullName "bin"
+
+          if (-not (Test-Path "$actualBin\ffmpeg.exe")) {
+          throw "FFmpeg executable not found at $actualBin"
+          }
+
+          "$actualBin" |
+          Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          Write-Output "Added FFmpeg to GITHUB_PATH: $actualBin"
+          }
+          }
+          }
+
+      - name: Verify ffmpeg
+        shell: powershell
+        run: |
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Generate installer assets (jumbie.ico + LICENSE.rtf)
+        uses: ./.github/actions/generate-installer-assets
+
+      - name: Clippy
+        shell: powershell
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          rustup component add clippy
+          cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+
+      - name: Run backend tests
+        shell: powershell
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          cargo test --locked --package jumbie
+
+      - name: Compile dummy-rust example plugin
+        shell: powershell
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          cargo check --locked --manifest-path examples/plugins/dummy-rust/Cargo.toml
+
+          # --- macOS CI -----------------------------------------------------
+          # Validates that the project compiles and all tests pass on macOS.
+  macos-test:
+    needs: [check-version]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: macos-latest
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        # Pinned to match rust-toolchain.toml so tests run on the same
+        # toolchain as the rest of CI (runners ship a stable toolchain).
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+          components: clippy
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install ffmpeg
+        run: |
+          brew untap aws/tap 2>/dev/null || true
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg
+          fi
+          ffmpeg -version
+
+      - name: Clippy
+        run: |
+          cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+
+      - name: Run backend tests
+        run: |
+          cargo test --locked --package jumbie
+
+      - name: Compile dummy-rust example plugin
+        run: |
+          cargo check --locked --manifest-path examples/plugins/dummy-rust/Cargo.toml
+
+          # ── Auto-tag ──────────────────────────────────────────────────────────────
+          # Creates a git tag matching the version in Cargo.toml if it doesn't exist.
+          # Only runs after all platform tests pass on a new version.
+  auto-tag:
+    needs: [check-version, linux-test, windows-test, macos-test]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Create tag from Cargo.toml version
+        uses: ./.github/actions/auto-tag
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+          # ── Docker image ──────────────────────────────────────────────────────────
+          # Builds once and pushes the image to GHCR with BOTH tags — latest and the
+          # Cargo.toml version (merges the Gitea flow's docker-latest + docker-version
+          # into a single gated build). Waits for auto-tag so the versioned tag always
+          # matches a real git tag.
+  docker:
+    needs: [check-version, linux-test, auto-tag]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Get version from Cargo.toml
+        id: version
+        uses: ./.github/actions/extract-version
+
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and Push Docker Image (latest + versioned)
+        run: |
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="ghcr.io/$REPO"
+          VERSION="${{ steps.version.outputs.version }}"
+          BUILD_DATE=$(date -u +%s)
+          docker build \
+          --build-arg VERSION=$VERSION \
+          --build-arg GIT_COMMIT=${{ github.sha }} \
+          --build-arg BUILD_DATE=$BUILD_DATE \
+          --build-arg TRUNK_VERSION=${{ env.TRUNK_VERSION }} \
+          -t $IMAGE_NAME:latest \
+          -t $IMAGE_NAME:$VERSION .
+          docker push $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:$VERSION
+
+          # --- Windows Release Build --------------------------------------------------
+          # Builds a native Windows binary. Only runs after all platform tests pass.
+  windows-release:
+    needs: [check-version, linux-test, windows-test, macos-test, auto-tag]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # publish-release generates the changelog from git history
+          fetch-depth: 0
+
+      - name: Get version from Cargo.toml
+        id: version
+        uses: ./.github/actions/extract-version
+
+      - name: Setup MSVC build environment
+        shell: pwsh
+        run: |
+          # GitHub's hosted Windows runners already run vcvars64, but local
+          # act runs do not. Find and source it, then persist the environment
+          # for subsequent steps (no-op on GitHub runners).
+          $vcvars = $null
+          $editions = @('Community', 'Enterprise', 'BuildTools', 'Professional')
+          $years = @('2022', '2019')
+          $baseDirs = @(
+          "${env:ProgramFiles}\Microsoft Visual Studio",
+          "${env:ProgramFiles(x86)}\Microsoft Visual Studio"
+          )
+          foreach ($base in $baseDirs) {
+          foreach ($year in $years) {
+          foreach ($ed in $editions) {
+          $candidate = "$base\$year\$ed\VC\Auxiliary\Build\vcvars64.bat"
+          if (Test-Path $candidate) {
+          $vcvars = $candidate
+          break
+          }
+          }
+          if ($vcvars) { break }
+          }
+          if ($vcvars) { break }
+          }
+          # Fallback: use vswhere to locate VS
+          if (-not $vcvars) {
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+          $vspath = & $vswhere -latest -property installationPath
+          if ($vspath) {
+          $candidate = Join-Path $vspath "VC\Auxiliary\Build\vcvars64.bat"
+          if (Test-Path $candidate) { $vcvars = $candidate }
+          }
+          }
+          }
+          if ($vcvars) {
+          Write-Output "Found vcvars64.bat at: $vcvars"
+          # Source the batch file and capture the environment it sets
+          cmd /c "`"$vcvars`" > nul 2>&1 && set" | ForEach-Object {
+          if ($_ -match '^([^=]+)=(.*)') {
+          $key = $matches[1]
+          $val = $matches[2]
+          if ($key -eq 'PATH') {
+          $val | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+          "$key=$val" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+          }
+          }
+          } else {
+          Write-Output "Warning: vcvars64.bat not found. Cargo may fail without MSVC tools."
+          }
+
+      - name: Install Trunk (Windows)
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;" + $env:PATH
+          # Skip the download if the pinned version is already installed
+          $expected = "${{ env.TRUNK_VERSION }}" -replace '^v', ''
+          if (Get-Command trunk -ErrorAction SilentlyContinue) {
+          $installed = trunk --version
+          if ($installed -match ("\b" + [regex]::Escape($expected) + "\b")) {
+          Write-Output "trunk $expected already installed, skipping"
+          exit 0
+          }
+          }
+          Invoke-WebRequest `
+          -Uri "https://github.com/trunk-rs/trunk/releases/download/${{ env.TRUNK_VERSION }}/trunk-x86_64-pc-windows-msvc.zip" `
+          -OutFile trunk.zip
+          Expand-Archive trunk.zip -DestinationPath "$env:USERPROFILE\.cargo\bin\" -Force
+
+      - name: Install ffmpeg
+        shell: pwsh
+        run: |
+          if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
+          Write-Output "ffmpeg already available on PATH, skipping"
+          } else {
+          choco install ffmpeg --no-progress -y --allow-downgrade
+          }
+
+      - name: Build Frontend (Trunk)
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          cd frontend
+          trunk build --release
+
+      - name: Generate installer assets (jumbie.ico + LICENSE.rtf)
+        # jumbie.ico is needed BEFORE the backend build: build.rs embeds it
+        # into the exe. LICENSE.rtf is consumed later by the MSI step.
+        uses: ./.github/actions/generate-installer-assets
+
+      - name: Build Backend
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          $env:SOURCE_VERSION = "${{ github.sha }}"
+          $env:SOURCE_DATE_EPOCH = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+          cargo build --release --locked --bin jumbie
+
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          & .\target\release\jumbie.exe --version
+          if (-not $?) { throw "Smoke test failed" }
+
+      - name: Package
+        id: package
+        shell: pwsh
+        working-directory: ${{ github.workspace }}
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          $asset = "jumbie-$v-windows-x86_64.zip"
+          Compress-Archive -Path target\release\jumbie.exe -DestinationPath $asset
+          echo "ASSET=$asset" >> $env:GITHUB_OUTPUT
+
+      - name: Publish to GitHub Release
+        uses: ./.github/actions/publish-release
+        with:
+          asset: ${{ steps.package.outputs.ASSET }}
+          version: ${{ steps.version.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+          # ── MSI installer (optional extra asset) ──────────────────────────────
+          # The zip above is the portable build; the MSI is an installer built with
+          # the WiX toolset v4 (dotnet tool). The icon + license RTF were already
+          # generated by the generate-installer-assets action (see above) from
+          # frontend/icons/icon-512.png and LICENSE — the repo stays the single
+          # source of truth, no generated artifacts are committed.
+
+      - name: Install .NET SDK (required for WiX toolset)
+        shell: pwsh
+        run: |
+          if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+          Invoke-WebRequest -Uri https://dot.net/v1/dotnet-install.ps1 -OutFile dotnet-install.ps1
+          .\dotnet-install.ps1 -Channel 10.0
+          $env:PATH = "$env:USERPROFILE\.dotnet;$env:USERPROFILE\.dotnet\tools;$env:PATH"
+          "$env:USERPROFILE\.dotnet" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+          Write-Output "dotnet already available — skipping install"
+          }
+
+      - name: Setup WiX
+        shell: pwsh
+        run: |
+          $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
+
+          if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
+          dotnet tool install --global wix --version 7.0.0
+          }
+
+          wix eula accept wix7
+
+          if (-not (wix extension list | Select-String "WixToolset.UI.wixext")) {
+          wix extension add WixToolset.UI.wixext
+          }
+
+      - name: Build MSI installer
+        id: package-msi
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:USERPROFILE\.dotnet\tools;" + $env:PATH
+          $v = "${{ steps.version.outputs.version }}"
+
+          # MSI ProductVersion must be major.minor.build — drop pre-release
+          # suffixes and any 4th segment (e.g. 0.4.7-hotfix.1 → 0.4.7).
+          $msiVersion = ($v -split '-')[0]
+          $parts = $msiVersion -split '\.'
+          if ($parts.Count -gt 3) { $msiVersion = ($parts[0..2] -join '.') }
+
+          $msi = "jumbie-$v-windows-x64.msi"
+          wix build backend/windows/jumbie.wxs `
+          -arch x64 `
+          -out $msi `
+          -d Version=$msiVersion `
+          -b target/release `
+          -b backend/windows `
+          -ext WixToolset.UI.wixext
+
+          if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+          }
+
+          echo "ASSET_MSI=$msi" >> $env:GITHUB_OUTPUT
+          echo "MSI built: $msi"
+
+      - name: Publish MSI
+        uses: ./.github/actions/publish-release
+        with:
+          asset: ${{ steps.package-msi.outputs.ASSET_MSI }}
+          version: ${{ steps.version.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+          # --- macOS Release Build --------------------------------------------------
+          # Builds on a native macOS runner with Xcode. Produces x86_64 + arm64
+          # binaries, merges them with lipo into a universal binary, and packages a
+          # single universal DMG. Only runs after all platform tests pass.
+  macos-release:
+    needs: [check-version, linux-test, windows-test, macos-test, auto-tag]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # publish-release generates the changelog from git history
+          fetch-depth: 0
+
+      - name: Get version from Cargo.toml
+        id: version
+        uses: ./.github/actions/extract-version
+
+      - name: Setup Rust
+        # GitHub macOS runners ship rustup, but the project pins 1.98.0 in
+        # rust-toolchain.toml — install it with the release targets explicitly.
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+          targets: x86_64-apple-darwin, aarch64-apple-darwin, wasm32-unknown-unknown
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install Node
+        run: |
+          # Skip the brew install if node@24 is already installed
+          brew list node@24 >/dev/null 2>&1 || printf 'y\n' | HOMEBREW_NO_AUTO_UPDATE=1 brew install node@24
+
+      - name: Install ffmpeg
+        run: |
+          # Skip the brew install if ffmpeg is already available
+          command -v ffmpeg >/dev/null 2>&1 || printf 'y\n' | HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg
+
+      - name: Install Trunk
+        run: |
+          ARCH=$(uname -m)
+          case "$ARCH" in
+          arm64) TRIPLE="aarch64-apple-darwin" ;;
+          x86_64) TRIPLE="x86_64-apple-darwin" ;;
+          *) echo "unknown arch $ARCH"; exit 1 ;;
+          esac
+          # Skip the download if the pinned version is already installed
+          if command -v trunk >/dev/null 2>&1 && trunk --version | grep -q "\b${TRUNK_VERSION#v}\b"; then
+          echo "trunk ${TRUNK_VERSION#v} already installed, skipping"
+          exit 0
+          fi
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL \
+          "https://github.com/trunk-rs/trunk/releases/download/${TRUNK_VERSION}/trunk-${TRIPLE}.tar.gz" \
+          | tar -xz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build Frontend (Trunk)
+        run: |
+          cd frontend && trunk build --release
+
+      - name: Build Backend (x86_64 + aarch64)
+        run: |
+          SOURCE_VERSION="${{ github.sha }}"
+          export SOURCE_VERSION
+
+          cargo build --release --locked --bin jumbie \
+          --target x86_64-apple-darwin
+          cargo build --release --locked --bin jumbie \
+          --target aarch64-apple-darwin
+
+      - name: Package universal DMG
+        id: package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ICON_SRC="frontend/icons/icon-512.png"
+          PLIST_SRC="backend/macos/Info.plist"
+
+          BUNDLE="Jumbie.app"
+          CONTENTS="$BUNDLE/Contents"
+          MACOS_DIR="$CONTENTS/MacOS"
+          RESOURCES="$CONTENTS/Resources"
+
+          rm -rf "$BUNDLE"
+          mkdir -p "$MACOS_DIR" "$RESOURCES"
+
+          # Merge both arch binaries into a single universal (fat) binary
+          lipo -create \
+          target/x86_64-apple-darwin/release/jumbie \
+          target/aarch64-apple-darwin/release/jumbie \
+          -output "$MACOS_DIR/jumbie"
+
+          cp "$PLIST_SRC" "$CONTENTS/Info.plist"
+
+          # Stamp the release version into the bundle plist — the committed
+          # plist is a dev template and would otherwise ship stale.
+          plutil -replace CFBundleShortVersionString -string "$VERSION" "$CONTENTS/Info.plist"
+          plutil -replace CFBundleVersion -string "$VERSION" "$CONTENTS/Info.plist"
+
+          # Convert PNG to .icns if iconutil is available
+          if command -v iconutil &>/dev/null; then
+          iconset="$(mktemp -d)/jumbie.iconset"
+          mkdir -p "$iconset"
+          for size in 16 32 64 128 256 512; do
+          sips -z "$size" "$size" "$ICON_SRC" \
+          --out "$iconset/icon_${size}x${size}.png" &>/dev/null || true
+          if [ "$size" -lt 512 ]; then
+          sips -z "$((size * 2))" "$((size * 2))" "$ICON_SRC" \
+          --out "$iconset/icon_${size}x${size}@2x.png" &>/dev/null || true
+          fi
+          done
+          iconutil -c icns "$iconset" -o "$RESOURCES/jumbie.icns" 2>/dev/null || \
+          cp "$ICON_SRC" "$RESOURCES/jumbie.png"
+          rm -rf "$(dirname "$iconset")"
+          else
+          cp "$ICON_SRC" "$RESOURCES/jumbie.png"
+          fi
+
+          # Ad-hoc sign so macOS caches the launch environment
+          codesign --force --deep --sign - "$BUNDLE" 2>/dev/null || true
+
+          # Staging folder: .app + /Applications drag-target symlink
+          DMG_STAGING="dmg-staging"
+          rm -rf "$DMG_STAGING"
+          mkdir "$DMG_STAGING"
+          cp -R "$BUNDLE" "$DMG_STAGING/"
+          ln -s /Applications "$DMG_STAGING/Applications"
+
+          DMG="jumbie-$VERSION-macos-universal.dmg"
+          VOLNAME="Jumbie"
+
+          # Create a read-write DMG, then convert to read-only compressed
+          hdiutil create \
+          -volname "$VOLNAME" \
+          -srcfolder "$DMG_STAGING" \
+          -ov \
+          -format UDRW \
+          "$DMG.rw.dmg"
+
+          hdiutil convert \
+          "$DMG.rw.dmg" \
+          -format UDZO \
+          -ov \
+          -o "$DMG"
+
+          rm -f "$DMG.rw.dmg"
+          rm -rf "$DMG_STAGING" "$BUNDLE"
+
+          echo "DMG=$DMG" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test (universal DMG)
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG="jumbie-$VERSION-macos-universal.dmg"
+          echo "=== Testing $DMG ==="
+
+          # Explicit mountpoint so we don't have to parse hdiutil output
+          MOUNTDIR="/Volumes/jumbie-test-$$"
+          if ! hdiutil attach "$DMG" -nobrowse -noverify -noautoopen -mountpoint "$MOUNTDIR" 2>&1; then
+          echo "FAIL: could not mount $DMG"
+          exit 1
+          fi
+          mountpoint="$MOUNTDIR"
+
+          APP="$mountpoint/Jumbie.app"
+          BIN="$APP/Contents/MacOS/jumbie"
+
+          test -d "$APP" || { hdiutil detach "$mountpoint" 2>/dev/null; echo "FAIL: .app missing"; exit 1; }
+          test -f "$BIN" || { hdiutil detach "$mountpoint" 2>/dev/null; echo "FAIL: binary missing"; exit 1; }
+          test -f "$APP/Contents/Info.plist" || { hdiutil detach "$mountpoint" 2>/dev/null; echo "FAIL: Info.plist missing"; exit 1; }
+          test -L "$mountpoint/Applications" || { hdiutil detach "$mountpoint" 2>/dev/null; echo "FAIL: /Applications symlink missing"; exit 1; }
+
+          echo "  ✓ .app present"
+          echo "  ✓ Info.plist present"
+          echo "  ✓ /Applications symlink present"
+
+          # Verify lipo produced a true universal binary
+          file "$BIN" | grep -q "universal binary" \
+          || { hdiutil detach "$mountpoint" 2>/dev/null; echo "FAIL: not a universal binary"; exit 1; }
+          echo "  ✓ universal binary (x86_64 + arm64) confirmed"
+
+          # Verify the release version was stamped into the bundle plist
+          PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist" 2>/dev/null || echo "")
+          if [ "$PLIST_VERSION" != "$VERSION" ]; then
+          hdiutil detach "$mountpoint" 2>/dev/null
+          echo "FAIL: bundle version $PLIST_VERSION != expected $VERSION"
+          exit 1
+          fi
+          echo "  ✓ bundle version $PLIST_VERSION"
+
+          # Check codesigning (ad-hoc)
+          echo -n "  ✓ codesign: "
+          codesign --verify --deep --strict "$APP" 2>&1 || echo "  (ad-hoc, expected)"
+
+          # Universal binary runs natively on either architecture
+          echo -n "  ✓ launch: "
+          "$BIN" --version || { hdiutil detach "$mountpoint" 2>/dev/null; echo "FAIL: --version failed"; exit 1; }
+
+          hdiutil detach "$mountpoint" 2>/dev/null
+          echo "  ✓ universal DMG passed"
+
+      - name: Publish universal DMG
+        uses: ./.github/actions/publish-release
+        with:
+          asset: ${{ steps.package.outputs.DMG }}
+          version: ${{ steps.version.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+          # --- Linux Release (single job, all formats) --------------------------------
+          # Builds Rust and Trunk once, then packages in all 4 formats (tarball, deb,
+          # rpm, AppImage) sequentially. Each format publishes its own asset to the
+          # same GitHub release — no redundant rebuilds.
+  linux-release:
+    needs: [check-version, linux-test, windows-test, macos-test, auto-tag]
+    if: needs.check-version.outputs.is_new == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # publish-release generates the changelog from git history
+          fetch-depth: 0
+
+      - name: Get version from Cargo.toml
+        id: version
+        uses: ./.github/actions/extract-version
+
+      - name: Setup Rust
+        # GitHub runners already ship rustup + a stable toolchain, but the
+        # project pins 1.98.0 in rust-toolchain.toml — install it explicitly.
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+          targets: wasm32-unknown-unknown
+
+      - name: Install Trunk
+        uses: ./.github/actions/install-trunk
+        with:
+          version: ${{ env.TRUNK_VERSION }}
+
+      - name: Install System Dependencies
+        uses: ./.github/actions/install-system-deps
+
+      - name: Cache sccache
+        # Restores linux-test's cache; the release build then reuses the
+        # C/C++ entries (ring, jemalloc, ...) and links with lld.
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/sccache
+          key: ${{ runner.os }}-sccache-${{ hashFiles('rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-
+
+      - name: Build Frontend (Trunk)
+        run: |
+          cd frontend && trunk build --release
+
+      - name: Build Backend
+        run: |
+          SOURCE_VERSION="${{ github.sha }}" \
+          SOURCE_DATE_EPOCH="$(date -u +%s)" \
+          cargo build --release --locked --bin jumbie
+
+      - name: Smoke test (shared libraries)
+        run: |
+          ldd target/release/jumbie | grep -i 'not found' && { echo "FAIL: missing shared libraries"; exit 1; } || true
+          echo "All shared library dependencies resolved"
+          ./target/release/jumbie --version
+
+          # ── Packaging ──────────────────────────────────────────────────────────
+
+      - name: Install rpm build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+          rpm \
+          rpm2cpio \
+          cpio \
+          ruby-dev \
+          build-essential
+          sudo gem install --no-document fpm
+
+      - name: Download appimagetool
+        run: |
+          wget -qO appimagetool \
+          "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool
+
+      - name: Package (tarball)
+        id: package-tarball
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH=$(uname -m)
+          ASSET="jumbie-$VERSION-linux-$ARCH.tar.gz"
+          tar -czf "$ASSET" -C target/release jumbie
+          echo "ASSET=$ASSET" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test (tarball)
+        run: |
+          ASSET="${{ steps.package-tarball.outputs.ASSET }}"
+          testdir="$(mktemp -d)"
+          tar -xzf "$ASSET" -C "$testdir"
+          "$testdir/jumbie" --version
+          rm -rf "$testdir"
+          echo "✓ tarball passed"
+
+      - name: Publish tarball
+        uses: ./.github/actions/publish-release
+        with:
+          asset: ${{ steps.package-tarball.outputs.ASSET }}
+          version: ${{ steps.version.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package (deb)
+        id: package-deb
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          case $(uname -m) in
+          x86_64)  DEB_ARCH=amd64  ;;
+          aarch64) DEB_ARCH=arm64  ;;
+          *)       DEB_ARCH=$(uname -m) ;;
+          esac
+          ASSET="jumbie_${VERSION}_${DEB_ARCH}.deb"
+
+          mkdir -p pkg/DEBIAN pkg/usr/local/bin
+
+          cat > pkg/DEBIAN/control <<EOF
+          Package: jumbie
+          Version: $VERSION
+          Section: video
+          Priority: optional
+          Architecture: $DEB_ARCH
+          Depends: ffmpeg, libxdo3
+          Maintainer: Jumbie <noreply@github.com>
+          Description: Series organizer and media manager
+           Jumbie automatically organizes your media library and tracks series.
+          EOF
+
+          cp target/release/jumbie pkg/usr/local/bin/jumbie
+          chmod 755 pkg/usr/local/bin/jumbie
+
+          dpkg-deb --build pkg "$ASSET"
+          echo "ASSET=$ASSET" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test (deb)
+        run: |
+          ASSET="${{ steps.package-deb.outputs.ASSET }}"
+          testdir="$(mktemp -d)"
+          dpkg-deb --extract "$ASSET" "$testdir"
+          "$testdir/usr/local/bin/jumbie" --version
+          rm -rf "$testdir"
+          echo "✓ deb passed"
+
+      - name: Publish deb
+        uses: ./.github/actions/publish-release
+        with:
+          asset: ${{ steps.package-deb.outputs.ASSET }}
+          version: ${{ steps.version.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package (rpm)
+        id: package-rpm
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          case $(uname -m) in
+          x86_64)  RPM_ARCH=x86_64   ;;
+          aarch64) RPM_ARCH=aarch64  ;;
+          *)       RPM_ARCH=$(uname -m) ;;
+          esac
+          ASSET="jumbie-$VERSION-1.$RPM_ARCH.rpm"
+
+          fpm \
+          --input-type dir \
+          --output-type rpm \
+          --name jumbie \
+          --version "$VERSION" \
+          --architecture "$RPM_ARCH" \
+          --description "Series organizer and media manager" \
+          --depends ffmpeg \
+          --depends libxdo \
+          --maintainer "Jumbie <noreply@github.com>" \
+          --url "https://github.com/${{ github.repository }}" \
+          --package "$ASSET" \
+          target/release/jumbie=/usr/local/bin/jumbie
+
+          echo "ASSET=$ASSET" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test (rpm)
+        run: |
+          ASSET="${{ steps.package-rpm.outputs.ASSET }}"
+          testdir="$(mktemp -d)"
+          cd "$testdir"
+          rpm2cpio "$OLDPWD/$ASSET" | cpio -idmv 2>/dev/null
+          "$testdir/usr/local/bin/jumbie" --version
+          rm -rf "$testdir"
+          echo "✓ rpm passed"
+
+      - name: Publish rpm
+        uses: ./.github/actions/publish-release
+        with:
+          asset: ${{ steps.package-rpm.outputs.ASSET }}
+          version: ${{ steps.version.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package (AppImage)
+        id: package-appimage
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCH=$(uname -m)
+
+          mkdir -p AppDir/usr/bin AppDir/usr/lib
+          cp target/release/jumbie AppDir/usr/bin/jumbie
+
+          # Bundle shared library dependencies so the AppImage is self-contained
+          ldd AppDir/usr/bin/jumbie | grep '=> /' | awk '{print $3}' | while IFS= read -r lib; do
+          libname=$(basename "$lib")
+          case "$libname" in
+          libc.so*|ld-linux*|libdl.so*|librt.so*|libm.so*) ;;
+          libpthread.so*|libutil.so*|libresolv.so*|libnss*) ;;
+          libBrokenLocale*|libanl.so*|libthread_db*) ;;
+          *)  cp -Lf "$lib" "AppDir/usr/lib/" ;;
+          esac
+          done
+
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          export LD_LIBRARY_PATH="$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          exec "$APPDIR/usr/bin/jumbie" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+          cat > AppDir/jumbie.desktop <<'EOF'
+          [Desktop Entry]
+          Name=Jumbie
+          Exec=jumbie
+          Icon=jumbie
+          Type=Application
+          Categories=AudioVideo;Video;
+          Comment=Series organizer and media manager
+          EOF
+
+          # Icon — a minimal 256x256 placeholder PNG (1×1 px scaled by viewers)
+          # Replace AppDir/jumbie.png with a real icon before enabling this job.
+          printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x01\x00\x00\x00\x01\x00\x08\x02\x00\x00\x00\x90\x81pf\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' \
+          > AppDir/jumbie.png
+
+          ARCH=$ARCH ./appimagetool --appimage-extract-and-run AppDir \
+          "Jumbie-$VERSION-$ARCH.AppImage"
+
+          echo "ASSET=Jumbie-$VERSION-$ARCH.AppImage" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test (AppImage)
+        run: |
+          ASSET="Jumbie-${{ steps.version.outputs.version }}-$(uname -m).AppImage"
+          echo "Testing $ASSET ..."
+          # --appimage-extract-and-run avoids the FUSE dependency (not available in containers)
+          ./"$ASSET" --appimage-extract-and-run --version
+
+      - name: Publish AppImage
+        uses: ./.github/actions/publish-release
+        with:
+          asset: ${{ steps.package-appimage.outputs.ASSET }}
+          version: ${{ steps.version.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}

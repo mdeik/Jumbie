@@ -1,0 +1,18 @@
+services:
+  jumbie:
+    image: ghcr.io/mdeik/jumbie:latest
+    container_name: jumbie
+    ports:
+      - "3000:3000"
+    environment:
+      - TZ=America/New_York
+      # - JUMBIE_LOG_LEVEL=info    # Default: info
+      # - JUMBIE_WORKER_THREADS=4  # Async workers (default: min(4, CPU count))
+    volumes:
+      # Config override (optional): only needed if you place a custom config.toml
+      # Otherwise Jumbie uses baked-in Docker defaults
+      # - ./config:/config
+      - ./data:/data
+      - ./plugins:/plugins
+      - ./logs:/logs
+    restart: unless-stopped

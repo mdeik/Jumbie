@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+    Name="Jumbie"
+    Manufacturer="Matthew Deik"
+    Version="$(var.Version)"
+    UpgradeCode="ECE299E6-A9E8-4576-B11E-0EA5BB2D49AF"
+    Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Jumbie is already installed." />
+
+    <!-- Icon for Add/Remove Programs display (generated from frontend/icons/icon-512.png in CI) -->
+    <Icon Id="jumbieIcon" SourceFile="jumbie.ico" />
+    <Property Id="ARPPRODUCTICON" Value="jumbieIcon" />
+
+    <!-- ARP metadata -->
+    <Property Id="ARPCOMMENTS" Value="Series organizer and media manager" />
+    <Property Id="ARPCONTACT" Value="Matthew Deik" />
+    <Property Id="ARPDISPLAYNAME" Value="Jumbie" />
+
+    <!-- License RTF for the WixUI LicenseAgreementDlg (generated from LICENSE in CI) -->
+    <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf" />
+
+    <Media Id="1" Cabinet="jumbie.cab" EmbedCab="yes" />
+
+    <!-- Install directory: Program Files\Jumbie (perMachine; the WixUI_InstallDir
+         InstallDirDlg lets the user type or browse to any path). -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLDIR" Name="!(bind.Property.ApplicationFolderName)">
+        <Component Id="jumbieBinary" Guid="AF8415B8-0CC3-4E39-A3DE-4806B2B909C5">
+          <File Id="jumbieExe" Name="Jumbie.exe" Source="Jumbie.exe" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Start Menu shortcut (per-machine, so uses HKLM for the key path) -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Jumbie">
+        <Component Id="StartMenuShortcut" Guid="74FD8D53-255A-435F-940B-3406245BF096">
+          <Shortcut Id="AppStartMenuShortcut"
+                    Name="Jumbie"
+                    Description="Series organizer and media manager"
+                    Target="[INSTALLDIR]Jumbie.exe"
+                    WorkingDirectory="INSTALLDIR"
+                    Advertise="no" />
+          <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+          <RegistryValue Root="HKLM" Key="Software\mdeik\Jumbie" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Desktop shortcut (optional; installed only if user opts in) -->
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="6E37DE62-C0A2-4957-B0D7-AB5F06CEF366">
+        <Shortcut Id="AppDesktopShortcut"
+                  Name="Jumbie"
+                  Description="Series organizer and media manager"
+                  Target="[INSTALLDIR]Jumbie.exe"
+                  WorkingDirectory="INSTALLDIR"
+                  Advertise="no" />
+        <RegistryValue Root="HKLM" Key="Software\mdeik\Jumbie" Name="DesktopShortcutInstalled" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <!-- Features
+         "ProductFeature"         - always installed: Jumbie binary.
+         "StartMenuFeature"       - default installed: Start Menu shortcut; user can uncheck.
+         "DesktopShortcutFeature" - optional (default off): desktop shortcut. -->
+    <Feature Id="ProductFeature" Title="Jumbie" Level="1"
+             Description="The Jumbie binary." Display="hidden">
+      <ComponentRef Id="jumbieBinary" />
+    </Feature>
+
+    <Feature Id="StartMenuFeature" Title="Start Menu Shortcut" Level="1"
+             Description="Add a Jumbie entry to the Start Menu.">
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <Feature Id="DesktopShortcutFeature" Title="Desktop Shortcut" Level="2"
+             Description="Place a shortcut to Jumbie on your desktop.">
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <!-- UI: WixUI_InstallDir → Welcome → License → InstallDir → VerifyReady → Progress → Exit.
+         Level=1 features install by default; DesktopShortcutFeature (Level=2) is hidden
+         and not installed. ProductFeature is hidden (always installed). -->
+    <Property Id="ApplicationFolderName" Value="Jumbie" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+
+    <ui:WixUI Id="WixUI_InstallDir" />
+
+  </Package>
+</Wix>

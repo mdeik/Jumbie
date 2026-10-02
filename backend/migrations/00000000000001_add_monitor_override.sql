@@ -1,0 +1,1 @@
+ALTER TABLE episodes ADD COLUMN monitor_override INTEGER NOT NULL DEFAULT 0;
